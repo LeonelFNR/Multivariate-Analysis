@@ -77,10 +77,12 @@ classified as outliers.**
 lof_scores <- lof(df_clean %>% select(bill_length_mm, flipper_length_mm), k = 20)
 threshold <- quantile(lof_scores, 0.975)
 outliers <- which(lof_scores > threshold)
+top5 <- order(lof_scores, decreasing = TRUE)[1:5]
 ggplot(df_clean, aes(x = bill_length_mm, y = flipper_length_mm)) +
   geom_point() +
   geom_point(data = df_clean[outliers, ], aes(x = bill_length_mm, y = flipper_length_mm), color = "red") +
-  labs(title = "Scatter plot with Outliers Highlighted")
+  geom_point(data = df_clean[top5, ], aes(x = bill_length_mm, y = flipper_length_mm), color = "red", size = 3) +
+  labs(title = "Scatter plot with LOF Outliers Highlighted")
 ```
 **Q3: Use the Isolation Tree algorithm with $100$ trees and identify the top 
 five outliers. Use the quantile $97.5\%$ to find the score threshold**
@@ -92,9 +94,11 @@ iso_model$fit(df_clean %>% select(bill_length_mm, flipper_length_mm))
 iso_scores <- iso_model$predict(df_clean %>% select(bill_length_mm, flipper_length_mm))$anomaly_score
 threshold_iso <- quantile(iso_scores, 0.975)
 outliers_iso <- which(iso_scores > threshold_iso)
+top5 <- order(iso_scores, decreasing = TRUE)[1:5]
 ggplot(df_clean, aes(x = bill_length_mm, y = flipper_length_mm)) +
   geom_point() +
   geom_point(data = df_clean[outliers_iso, ], aes(x = bill_length_mm, y = flipper_length_mm), color = "red") +
+  geom_point(data = df_clean[top5, ], aes(x = bill_length_mm, y = flipper_length_mm), color = "red", size = 3) +
   labs(title = "Scatter plot with Isolation Forest Outliers Highlighted")
 ```
 **Q4: From the previous results, which observations can be considered outliers?
@@ -115,7 +119,15 @@ Now using the `df` dataframe, answer the following questions:
 **Q5: Are there missing values? How we classify them (MCAR; MAR; MNAR)?
 Quantify the quality of the data using the missing values.**
 
-Yes, there are two types of missing values. There are some observations where absolutely no information exists (all columns are null) and there are some observations where the column sex is missing. The first type of missing values can be classified as MCAR, since the fact that they are missing is completely random and does not depend on any other variable. The second type of missing values can be classified as MAR, the missingness is related to observed data but not the missing values themselves.
+```{r}
+library(naniar)
+vis_miss(df)
+paste0("Percentage of complete cases: ", round(sum(complete.cases(df))/nrow(df)*100,1), "%")
+```
+
+Yes, there are two types of missing values. There are some observations where absolutely no information exists (all columns are null except the spcecies column) and there are some observations where the column sex is missing. The first type of missing values can be classified as MCAR, since the fact that they are missing is completely random and does not depend on any other variable. The second type of missing values can be classified as MAR, the missingness is related to observed data but not the missing values themselves.
+
+The data set presents an excellent quality as we consider that there's no MNAR and the percentge of missing values is 0.9% and the percentage of complete cases is `r round(sum(complete.cases(df))/nrow(df)*100,1)`%.
 
 
 **Q6: Perform a k-NN Imputation and a MICE imputation. Compare 
@@ -207,7 +219,7 @@ outliers_knn <- which(lof_scores_knn > threshold_knn)
 ggplot(df_1nn, aes(x = bill_length_mm, y = flipper_length_mm)) +
   geom_point() +
   geom_point(data = df_1nn[outliers_knn, ], aes(x = bill_length_mm, y = flipper_length_mm), color = "red") +
-  labs(title = "Scatter plot with kNN Imputed Outliers Highlighted")
+  labs(title = "Scatter plot with kNN Imputed LOF Outliers Highlighted")
 ```
 ```{r}
 # also the isolation tree algorithm
@@ -232,7 +244,7 @@ outliers_mice <- which(lof_scores_mice > threshold_mice)
 ggplot(df_mice, aes(x = bill_length_mm, y = flipper_length_mm)) +
   geom_point() +
   geom_point(data = df_mice[outliers_mice, ], aes(x = bill_length_mm, y = flipper_length_mm), color = "red") +
-  labs(title = "Scatter plot with MICE Imputed Outliers Highlighted")
+  labs(title = "Scatter plot with MICE Imputed LOF Outliers Highlighted")
 ```
 ```{r}
 # also the isolation tree algorithm
@@ -261,12 +273,12 @@ centered data matrix $X_c$. Only matrix and vector operations are allowed.**
 
 ```{r}
 # Sample mean vector
-m <- colMeans(df_clean)
+n <- nrow(df_clean)
+m <- t(as.matrix(df_clean)) %*% matrix(1, n, 1) / n
 # print
 print(m)
 
 # Centering matrix
-n <- nrow(df_clean)
 H <- diag(n) - (1/n) * matrix(1, n, n)
 #print(H)
 
