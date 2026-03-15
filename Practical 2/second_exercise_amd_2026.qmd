@@ -1,0 +1,299 @@
+---
+title: "Lab 2: PCA"
+format: pdf
+editor: visual
+execute: 
+  warning: false
+  message: false
+---
+
+# Exercise 2 MVA
+
+Work to be done in pairs.
+
+Due date 22/03/2026.
+
+## PCA
+
+```{r}
+#| include: false
+library(GGally)
+library(FactoMineR)
+library(factoextra)
+```
+
+For this laboratory we are going to work with data about Italian restaurants in Manhattan.
+
+The following instruction will load the data into the data variable\
+(url to download the data:\
+<https://raw.githubusercontent.com/Afrojam/toy_datasets/refs/heads/main/nyc.csv>\
+)
+
+```{r}
+data = read.csv("https://raw.githubusercontent.com/Afrojam/toy_datasets/refs/heads/main/nyc.csv", row.names = 1)
+head(data)
+```
+
+The variables are:
+
+-   **Price**: Average price of the meal plus a drink, in US \$.
+
+-   **Food, Decor, Service**: Food quality, local decoration and service as ranked by Zagat.com (0 to 25)
+
+-   **Location**: Categorical variable: East if restaurant located on the East side and West if located on the West side.
+
+Take a first look onto the data (consider the following plot when doing the analysis):
+
+```{r}
+ggpairs(data)
+```
+
+From now on, we will only work with numerical data, so we drop the Location variable.
+
+```{r}
+data2 <- data[,1:4]
+```
+
+### Exercises
+
+For this exercise, libraries that automate the computation of PCA are permitted: prcomp from base R, PCA from FactoMineR, rda in Vegan, etc. It is also possible to use auxiliary libraries to perform the plots (i.e: factoextra)
+
+1.  Perform a PCA on the data without scaling the variables. Show the principal components and their variance.
+
+    ```{r}
+    # pca on the data without scaling the variables. show principal components and their variance
+    res.pca.noscale <- PCA(data2, scale.unit = FALSE, graph = FALSE)
+    get_eigenvalue(res.pca.noscale)
+    fviz_eig(res.pca.noscale, addlabels = TRUE, choice = "variance", axes = 1 )
+    ```
+
+    ```{r}
+    fviz_eig(res.pca.noscale, addlabels = TRUE, choice = "eigenvalue", axes = 1 )
+    ```
+
+2.  Study the variance. Is there a size effect? If there is any, take action to correct it and from now on use the corrected principal components to perform the analysis. Justify your decisions.
+
+    There a size in effect actually. If we inspect the plot we can see that PC1 explains 92.3% of the variance, while the other components explain 4.1, 2.9 and 0.7% respectively. This is evidence that there is a variable with a much greater variance and that it's dominating de PCA. Inspecting the dataset, we can suspect that the causing variable is "Price", since it usually achieves bigger values compared to the other variables. To correct this effect, the variables must be standardized before applying PCA. Therefore, from this point on, the analysis should be based on the PCA computed with scaled variables.
+
+    ```{r}
+    res.pca <- PCA(data2, scale.unit = TRUE, graph = FALSE)
+    res.pca$eig
+    ```
+
+3.  Perform a scree plot and the accumulated variance captured by the principal components. Will be a good approximation if we only use the first two principal components?
+
+    ```{r}
+    res.pca <- PCA(data2, scale.unit = TRUE, graph = FALSE)
+    #scree plot
+    fviz_eig(res.pca, addlabels = TRUE)
+    ```
+
+    ```{r}
+    get_eigenvalue(res.pca)
+    ```
+
+    The scree plot shows that the first principal component explains 74.92% of the variance, and the second explains 14.04%. Together, the first two components capture 88.96% of the total variance.\
+
+    Since this percentage is very high, using only the first two principal components provides a good approximation of the data while significantly reducing the dimensionality. The scree plot also shows a clear elbow after the second component, indicating that the remaining components contribute relatively little additional information.
+
+4.  Study the loadings (principal components with its standard deviation). What can be observed?
+
+    ```{r}
+    res.pca$var$coord
+    ```
+
+    The loadings show how each variable contributes to the principal components.\
+    For the first principal component, all variables (Price, Food, Decor and Service) have large positive loadings. This indicates that PC1 represents the overall quality level of the restaurants: restaurants with higher values in this component tend to have higher prices and better ratings in food, decor and service.
+
+    The second principal component contrasts Decor and Price with Food and Service. Decor and Price have positive loadings, while Food and Service have negative loadings. This suggests that PC2 separates restaurants that emphasize decor and price from those that emphasize food quality and service.
+
+    The third and fourth components explain a small proportion of the variance, so they are less important for interpreting the structure of the data.
+
+5.  Calculate the contributions and the squared cosines of the variables. Which variable contributed the most to the first principal component and which one to the second principal component? Which variables are better represented by the third and fourth principal components? Justify all your answers.
+
+    ```{r}
+    res.pca$var$contrib
+    ```
+
+    The variable that contributes the most to the first principal component is **Service** (27.11%). This indicates that the first principal component is strongly influenced by the service rating, although all variables contribute significantly.
+
+    The variable that contributes the most to the second principal component is **Decor** (40.54%), followed by **Food** (37.59%). This shows that the second component mainly contrasts restaurants according to their decor and food ratings.
+
+    ```{r}
+    res.pca$var$cos2
+    ```
+
+    ```{r}
+    fviz_contrib(res.pca, choice = "var", axes = 1)
+    ```
+
+    ```{r}
+    fviz_contrib(res.pca, choice = "var", axes = 2)
+    ```
+
+    The variable best represented by the third principal component is **Price**, since it has the highest squared cosine value (0.153). This means that PC3 captures part of the variability associated with the price variable.
+
+    For the fourth principal component, the variable **Service** has the highest squared cosine (0.061), meaning it is the variable best represented by this component.
+
+6.  Calculate the PCA scores matrix, and the contributions and squared cosines of the individuals. What we can say from the restaurant Rao's and Gennaro in the context of the third principal component and its relation with the original data? Provide a restaurant that will have a poor representation if using only the first two principal components. Justify all your answers.
+
+    ```{r}
+    # PCA scores (coordinates of individuals)
+    scores <- res.pca$ind$coord
+
+    # Contributions of individuals
+    contributions <- res.pca$ind$contrib
+
+    # Squared cosines of individuals
+    cosines <-res.pca$ind$cos2
+    ```
+
+7.  Perform a plot of the variables. What can we say about the principal axes and the variables?
+
+8.  Perform a plot of the observations. What we can say about the following restaurants:
+
+    1.  Veronica.
+
+    2.  Ranbow Grill.
+
+    3.  Lamarca.
+
+    Remember to use all the information available about the representation in the reduced dimensional space.\
+
+    ```{r}
+    #| eval: false
+    #| include: false
+    res <- PCA(data2)
+    restaurant <- c("Paola's","Sette Mezzo","Torre di Pisa","Primavera", "Veronica", "Rainbow Grill", "Fino", "Lamarca", "Basta Pasta")
+    subset <- res$ind$coord[restaurant,]
+    plot(subset, xlim = c(-5,5), ylim=c(-3,3), xlab = "PC1", ylab = "PC2")
+    text(subset, labels = rownames(subset), pos = 4, cex = 0.7)
+    abline(v=0, h=0)
+    plot(scale(data[restaurant,c(4,3)], scale = FALSE), xlab = "SERVICE", ylab = "DECOR")
+    text(scale(data[restaurant,c(4,3)], scale = FALSE), labels = rownames(subset), pos = 4, cex = 0.7)
+    abline(v=0, h=0)
+    ```
+
+9.  We used location as supplementary variable and performed the following plot of individuals marked by their Location (points East, Triangles West):\
+    \
+    Based on your interpretation of the principal components, what can we say about East and West restaurants?
+
+    ```{r echo=FALSE}
+    res2 <- PCA(data, quali.sup="Location", graph=FALSE)
+    fviz_pca_ind(res2, select.ind = list(cos2=35),habillage = "Location", palette=c("#00AFBB", "#E7B800"), xlim=c(-4,4), ylim=c(-2,2), mean.point=FALSE, repel=TRUE)
+    ```
+
+10. One of your best friends is going to Manhattan and she wants to eat at a restaurant with the following conditions:\
+    High food quality.\
+    Not caring about the decoration.\
+    Good service.\
+    Cheap.\
+    Which restaurant would you recommend? Justify your answer.
+
+## Factor Analysis
+
+The dataset *attitude* represents a survey of clerical employees (clerks) in 30 large financial institutions, measuring their "attitude" toward their workplace. The data are aggregated from the questionnaires of the approximately 35 employees for each of 30 randomly selected departments. The numbers give the percent proportion of favorable responses to seven questions in each department. The variables are: - Rating: (Target variable). Overall rating of the department by its employees. It's how happy or satisfied the employees are. - Complaints: Feel about how well complaints are handled by the management. - Privileges: Feel about how the management allows for special privileges. - Learning: Feel about to opportunities to learn new skills and grow within the role. - Raises: Perception about pay raises are based on meritocracy rather than seniority or favoritism - Critical: Feel about how much the department focuses on mistakes. - Advance: Perception about promotion or advancement within the organization.
+
+The goal is to perform factorial analysis on this dataset and compare results from different methods of FA with Varimax rotation and also to interpret the most probable factors within the data.
+
+```{r}
+library(psych)
+data(attitude)
+X <- attitude
+n <- nrow(X)
+p <- ncol(X)
+Xs <- scale(X)
+R <- 1/(n-1)*t(Xs)%*%Xs
+
+res.eig <- eigen(R)
+D <- diag(res.eig$values)
+V <- res.eig$vectors
+```
+
+1.  Compute the PCA approach to Factor Analysis:
+
+-   Decide the number of factors and compute the loadings.
+
+```{r pcafa_factors_and_loadings}
+
+```
+
+-   Compute communalities.
+
+```{r pcafa_communalities}
+
+```
+
+-   Compute uniqueness (unique variances).
+
+```{r pcafa_uniqueness}
+
+```
+
+-   Perform a varimax rotation (*?varimax*) and interpret the factors.
+
+```{r pcafa_varimax}
+
+```
+
+-   Compute the factor scores by Thomson-Thurstone
+
+```{r pcafa_scores}
+
+```
+
+2.  Compute the Maximum Likelihood Estimation approach to Factor Analysis using the `fa` method from the `psych` library using the argument **fm="ml"**:
+
+-   Decide the number of factors and provide the loadings.
+
+```{r ml_factors_and_loadings}
+?fa
+```
+
+-   Give communalities.
+
+```{r ml_communalities}
+
+```
+
+-   Give the unique variances
+
+```{r ml_unique_variances}
+
+```
+
+-   For each loading compute its sum of squares. Argument why communalities and squared sum of loadings are different.
+
+```{r communalities_vs_ssl}
+
+```
+
+-   Give the rotated loadings by a varimax rotation
+
+```{r ml_varimax}
+
+```
+
+-   Give the rotated loadings by a oblimin rotation
+
+```{r ml_oblimin}
+
+```
+
+-   Compare the varimax rotated loadings with those of the oblimin. Interpret the factors
+
+```{r ml_factor_interpretation}
+
+```
+
+-   Compute the factor scores by Thomson
+
+```{r ml_scores}
+
+```
+
+-   Compare the rotated loadings from PCA and the ones from ML. Identify and discuss any significant discrepancies between the two sets of loadings.
+
+```{r pcafa_vs_mlfa}
+
+```
