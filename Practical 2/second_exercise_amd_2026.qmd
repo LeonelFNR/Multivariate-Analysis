@@ -2,6 +2,7 @@
 title: "Lab 2: PCA"
 format: pdf
 editor: visual
+authors: Leonel Nabaza and Michael Jiménez
 execute: 
   warning: false
   message: false
