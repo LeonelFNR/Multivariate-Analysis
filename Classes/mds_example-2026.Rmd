@@ -1,0 +1,221 @@
+---
+title: "mds_example_1"
+author: "Jamie Arjona"
+date: "2024-05-06"
+output: pdf_document
+---
+
+Load libraries
+```{r}
+library("MASS") # isoMDS and shepard plot.
+```
+
+
+```{r}
+Spain <- as.matrix(read.table("data/SpainDist.dat", header=TRUE))
+rownames(Spain) <- colnames(Spain)
+n <- nrow(Spain)
+mds.out <- cmdscale(Spain,k=n-1,eig=TRUE)
+X <- mds.out$points[,1:2]
+plot(X[,2],X[,1],type="n", xlab="", ylab="", main="Map of Spain",asp=1,
+xlim=c(-800,800),ylim=c(-800,500))
+points(X[,2],X[,1],pch=19,cex=0.5)
+text(X[,2],X[,1],rownames(Spain), cex=0.5,pos=1)
+```
+
+```{r}
+ev <- mds.out$eig
+gof <- mds.out$GOF
+print(round(ev,digits=2))
+print(round(gof,digits=4))
+```
+
+
+```{r}
+(ev[1]+ev[2])/sum(abs(ev))
+
+(ev[1]+ev[2])/sum(ev[ev>0])
+```
+
+```{r}
+mds.out <- cmdscale(Spain,k=2,eig=TRUE)
+mds.out$GOF
+```
+
+Sheppard plot, quality of the representation
+```{r}
+plot(as.dist(Spain), dist(mds.out$points), ylab = "approximated distances", 
+     xlab="true distances", xlim=c(0,1500), ylim=c(0,1500), main="Shepard plot")
+abline(lm(dist(mds.out$points) ~ as.dist(Spain)), col="red")
+```
+
+## Spain distances non-metric MDS approach:
+```{r}
+init_config <- scale(matrix(runif(n*2), ncol=2), scale = FALSE)
+nmds.out <- isoMDS(as.dist(Spain), y=init_config, k=2, maxit=200)
+Y <- nmds.out$points
+```
+
+Next we are going to use as initial config the solution obtained by PCorA:
+```{r}
+nmds2.out <- isoMDS(as.dist(Spain), y=X, k=2, maxit=200)
+Y2 <- nmds.out$points
+```
+
+Nonmetric MDS solution:
+Note: Sometimes axes are reversed and need to be adjusted using multiplication by -1.
+```{r}
+plot(1*Y[,2],-1*Y[,1],pch=19, asp=1, main="Map of Spain using non metric MDS")
+text(1*Y[,2], -1*Y[,1], rownames(Spain), cex=0.5,pos=1)
+```
+Shepard plot of NMDS:
+```{r}
+plot(as.dist(Spain), dist(Y), ylab = "approximated distances", 
+     xlab="true distances", main="Shepard plot")
+abline(lm(dist(Y) ~ as.dist(Spain)), col="red")
+```
+
+In the ndms with initial as cmdscale output:
+```{r}
+plot(as.dist(Spain), dist(Y2), ylab = "approximated distances", 
+     xlab="true distances", main="Shepard plot")
+abline(lm(dist(Y2) ~ as.dist(Spain)), col="red")
+```
+
+Plotting the stress for different number of dimensions:
+```{r}
+stress_list <- c()
+for (k in 1:5){
+  init_config <- scale(matrix(runif(n*k), ncol=k), scale = FALSE)
+  stress_list <- append(stress_list, nmds.out <- isoMDS(as.dist(Spain), y=init_config, k=k, maxit=200)$stress)
+}
+plot(stress_list, main="Stress versus dimensionality", xlab="# of dimensions", 
+     ylab="Stress value", pch=19)
+lines(stress_list)
+```
+## Without distances (rank orders)
+NMDS does not need distances, it just needs the ordered ranks of the data, i.e.:
+data ordered by rank similarity. With that it can obtain good approximates of the data.
+Now we are going to create a new dataset called SpainRank in which we will have the
+rank orders between cities based on the distance instead of the true distances.
+```{r}
+#?rank
+# rank(c(10, 11, 100, 35, 1))
+init <- (matrix(runif(n*2),ncol=2))
+Spain.out <- isoMDS(Spain,y=init,k=2,maxit=100)
+X.original <- Spain.out$points # backup the obtained points
+
+DistVec <- Spain[lower.tri(Spain)]
+DistVecRank <- rank(DistVec)
+SpainRank <- Spain
+SpainRank[lower.tri(SpainRank)] <- DistVecRank
+SpainRank[upper.tri(SpainRank)] <- 0
+diag(SpainRank) <- 0
+SpainRank <- SpainRank + t(SpainRank)
+SpainRank.out <- isoMDS(SpainRank,y=init,k=2,maxit=100)
+X.rank <- SpainRank.out$points
+```
+Let's compare the outputs:
+```{r}
+pairs(cbind(X.original,X.rank))
+cor(cbind(X.original,X.rank))
+```
+
+Comparing MDS and NMDS solutions
+```{r}
+pairs(cbind(X.original,mds.out$points[,1:2]), labels = c("nmds x", "nmds y", "mds x", "mds y"))
+cor(cbind(X.original,mds.out$points[,1:2]))
+```
+
+
+# Toy example: Metric vs non-metric
+```{r}
+toy <- matrix(c(0,1,10,1,0,9,10,9,0), nrow=3)
+toy.rank <- matrix((rank(toy)), nrow = 3)
+diag(toy.rank) <- 0
+mds.out <- cmdscale(dist(toy), k=1)
+nmds.out <- isoMDS(toy.rank, y=matrix(runif(3*1), nrow=3), k=1)
+plot(mds.out, c(1,1,1), xlab = "First dim", ylab="Second dim", asp=1)
+plot(nmds.out$points, c(1,1,1), xlab = "First dim", ylab="Second dim", asp=1)
+```
+
+## Soda perception example
+We can work with subjective similarities or perceptions as distances and use metric
+or nonmetric mds. This gives us a way to interpret this type of data when we relate
+it with the axes.
+```{r}
+soda <- matrix(c(
+  0, 35, 79, 86, 76, 63, 58, 62, 66, 26,
+  35, 0, 54, 56, 30, 41, 86, 81, 24, 61,
+  79, 54, 0, 70, 51, 38, 78, 72, 69, 70,
+  86, 56, 70, 0, 66, 90, 50, 89, 66, 89,
+  76, 30, 51, 66, 0, 35, 76, 68, 23, 63,
+  63, 41, 38, 90, 35, 0, 77, 54, 35, 68,
+  58, 86, 78, 50, 76, 77, 0, 66, 77, 59,
+  62, 81, 72, 89, 68, 54, 66, 0, 71, 34,
+  66, 24, 69, 66, 23, 35, 77, 71, 0, 59,
+  26, 61, 70, 89, 63, 68, 59, 34, 59, 0
+), nrow = 10)
+soda_names <- c("Diet Pepsi", "RC", "Yukon", "Dr.Pepper", "Shasta", "Coca Cola", "Diet Dr.Pepper", "TAB", "Pepsi", "Diet Rite")
+rownames(soda) <- soda_names
+colnames(soda) <- soda_names
+# sanity check isSymmetric.matrix(data)
+```
+
+```{r}
+mds.soda <- cmdscale(soda, k=2, eig=T)
+mds.soda$eig
+```
+
+Plot of the new configuration:
+```{r}
+plot(X[,2],X[,1],type="n", xlab="", ylab="", main="Soda perception",asp=1,
+xlim=c(-40,40),ylim=c(-40,40), axes = "F")
+# axis(1, pos=0)
+# axis(2, pos=0)
+arrows(c(0,c(-40,40)[1]),c(c(-40,40)[1],0),c(0,c(-40,40)[2]),c(c(-40,40)[2],0),0.05)
+points(mds.soda$points[,2],mds.soda$points[,1],pch=19,cex=0.5,)
+text(mds.soda$points[,2],mds.soda$points[,1],soda_names, cex=0.8,pos=1)
+points(0,0, pch=19)
+text(0,0, "(0,0)", cex=0.8,pos=1)
+```
+
+# A look to another package: vegan
+This package has gained some popularity recently as it provides a NMDS with more
+automation than the one given by *isoMDS* of the MASS package.
+Vegan offers the function *metaMDS* that calls monoMDS (monotonic MDS) or isoMDS
+but also automatizes the initialization of the init configuration of points, performs
+scaling and rotation. In addition, we can use different distances like bray-curtis (check vegdist help)
+and use auxiliary functions to interpret the output in a similar fashion as one does with PCA.
+
+Note: Because *vegan* is made for ecological data, the nomenclature is somehow special.
+It makes the distinction of `sites` and `species`. For us, the sites are the samples
+and species are the variables. We do not need species as we are working with distances/similarities.
+```{r}
+library("vegan")
+# ?metaMDS
+# ?vegdist
+```
+
+We are going to use the soda data, as it is based on perception and we can obtain
+insights from the axis:
+```{r}
+mds.vegan.soda <- metaMDS(soda, k=2, eig=T)
+```
+
+Let's check the output:
+1. googness gives us goodness of fit for each point.
+2. stressplot gives us the Shepard diagram of the nonmetric mds. Since it uses
+monotonic regression, it is no longer a stright line, but as in metric mds, we
+are interested in obtain a diagonal cloud of points.
+```{r}
+goodness(mds.vegan.soda)
+stressplot(mds.vegan.soda)
+```
+
+Plotting the output
+```{r}
+plot(mds.vegan.soda, "sites", type="n")
+orditorp(mds.vegan.soda, "sites")
+arrows(c(0,c(-40,40)[1]),c(c(-40,40)[1],0),c(0,c(-40,40)[2]),c(c(-40,40)[2],0),0.05)
+```

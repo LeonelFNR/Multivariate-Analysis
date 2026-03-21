@@ -1,0 +1,140 @@
+---
+title: "fa_example_2"
+author: "Jamie Arjona"
+date: "2024-05-15"
+output: pdf_document
+---
+# Exploring rotations from PCA
+Practitioners usually perform the varimax rotation after obtaining the PCA solution
+in order to get better and clear interpretability of the results.
+
+This is not FA, but is a "mix" between PCA and FA.
+
+```{r}
+library(FactoMineR)
+library(factoextra)
+library(readr)
+library(tidyverse)
+```
+
+```{r}
+data <- read_csv("data/expenses.csv")
+row_names <- data %>% select(1) %>% as.list
+X <- data %>% select(bread, vegetables, fruits,  meat, poultry,  milk,  wine) %>% as.matrix
+n <- dim(X)[1]
+p <- dim(X)[2]
+rownames(X) <- row_names$...1
+```
+
+Performing PCA:
+```{r}
+pca.res <- PCA(X, ncp = 4, graph = FALSE)
+pca.ind <- pca.res$ind
+pca.var <- pca.res$var
+```
+
+A fast summary of the results:
+```{r}
+summary(pca.res)
+```
+
+## Variables:
+**Observation**: Notice that we are in the variable space. Here the distances are represented by
+the Mahalanobis distance, so coordinates of the variables are correlations (because
+standarization) between variables and principal axis. In addition, notice that 
+the square of the correlations (or coordinates) are the squared cosines as distances
+are measure in Mahalanobis distance.
+```{r}
+pca.res$var
+```
+We can get extra interpretability using the factoextra package. For example a plot
+of the contributions and square cosines of the variables:
+```{r}
+fviz_contrib(pca.res, "var", axes=1)
+fviz_cos2(pca.res, "var", axes=1)
+```
+We can also obtain information about the relation of which variables are more related
+to the principal components performing some statistical tests:
+```{r}
+dimdesc(pca.res)
+```
+
+
+## Individuals
+Output from the individuals.
+NOTE: Distance is computed as:
+sqrt(rowSums((scale(as.matrix(X)) * sqrt(nrow(X)/(nrow(X) - 1)))**2))
+gives us the length of the vector of the standardized individual. Is not related
+to the coordinate in the PC space but gives us some intuitions of proximity
+between individuals in the original space.
+
+Distances in the individual space are Euclidean.
+```{r}
+pca.res$ind
+```
+
+Plots of contributions and squared cosines:
+```{r}
+fviz_contrib(pca.res, "ind", axes=1)
+fviz_cos2(pca.res, "ind", axes=1)
+```
+It seems that there is a size effect caused by the individual number 12.
+
+## Biplot
+
+Check the individuals biplot:
+```{r}
+fviz_pca_biplot(pca.res, repel=TRUE)
+```
+
+Our goal is to perform varimax in order to obtain better interpretability:
+```{r}
+nd <- 2
+Y_var <- pca.res$var$coord[,1:nd]
+Y_ind <- pca.res$ind$coord[,1:nd]
+Y_var.rot <- varimax(Y_var)
+
+rot.eigenval <- diag(t(Y_var.rot$loadings)%*%Y_var.rot$loadings)
+```
+Observe that the name of the items have changed to loadings once we performed the
+rotation.
+In this case (unlike in FA, PCA does not computes specificities) sum of diagonal 
+elements of matrix of loadings is equal to the sum of the eigenvalues.
+```{r}
+sum(rot.eigenval)
+sum(pca.res$eig[1:nd,1])
+```
+
+We can obtain the rotated individuals from the rotation estimated on the variables
+```{r}
+Xs <- scale(X) #needed
+Y_stan.ind.rot <- Xs%*%solve(cor(X))%*%Y_var.rot$loadings
+Y_ind.rot <- Y_stan.ind.rot %*% diag(sqrt(rot.eigenval)) # undo standardization
+```
+
+Performing the plots
+```{r}
+library(calibrate)
+ze = rep(0,p)
+plot(Y_var.rot$loadings,type="n",xlim=c(-1,1),ylim=c(-1,1))
+text(Y_var.rot$loadings, col="blue", labels = colnames(X))
+arrows(ze, ze, Y_var.rot$loadings[,1], Y_var.rot$loadings[,2], length = 0.07,col="blue")
+abline(h=0,v=0,col="gray")
+circle(1)
+plot(Y_ind.rot,type="n")
+text(Y_ind.rot,col=as.numeric(data$STATUS), labels = rownames(X))
+abline(h=0,v=0,col="gray")
+```
+Compare with the not rotated version:
+```{r}
+ze = rep(0,p)
+plot(Y_var,type="n",xlim=c(-1,1),ylim=c(-1,1))
+text(Y_var, col="blue", labels = colnames(X))
+arrows(ze, ze, Y_var[,1], Y_var[,2], length = 0.07,col="blue")
+abline(h=0,v=0,col="gray")
+circle(1)
+plot(Y_ind,type="n")
+text(Y_ind,col=as.numeric(data$STATUS), labels = rownames(X))
+abline(h=0,v=0,col="gray")
+```
+

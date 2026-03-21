@@ -1,0 +1,237 @@
+---
+title: "practice_3_pca_example_1"
+author: "Jamie Arjona"
+header-includes:
+   - \usepackage{bbm}
+   - \usepackage{amsmath}
+   - \usepackage{mathtools}
+   - \usepackage{subcaption}
+   - \usepackage{bm}
+date: "2024-04-17"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Biostatistics students
+
+We have a sample of $n=100$ from biostatistics students. The study measured the 
+following variables:
+$X_1=\text{weight, } X_2=\text{height, } X_3=\text{shoulders width, } X_4=\text{hip width}$
+(in kg. and cm.)
+we got the following results:
+1. $\overline{x}_1=54.25$, $\overline{x}_2=161.73$, $\overline{x}_3=36.53$, $\overline{x}_4=30.1$.
+2. Covariance matrix:
+
+$$
+\begin{equation*}
+        \textbf{S}=
+        \begin{pmatrix}
+            44.7  & 17.79 & 5.99 & 9.19  \\
+            17.79 & 26.15 & 4.52 & 4.44 \\
+            5.99  & 4.52  & 3.33 & 1.34 \\
+            9.19  & 4.44  & 1.34 & 4.56
+        \end{pmatrix}
+\end{equation*}
+$$
+Perform an analysis of the principal components and obtain:
+1. Eigenvectors and eigenvalues in a table and the variance explained by each one.
+2. Select the number of components by Kaiser method or scree plot.
+3. Compute the principal components.
+4. Interpretation of the principal components.
+```{r cars}
+means <- c(54.25, 161.73, 36.53, 30.1)
+covariances <- matrix(c(44.7  , 17.79 , 5.99 , 9.19,
+                        17.79 , 26.15 , 4.52 , 4.44,
+                        5.99  , 4.52  , 3.33 , 1.34,
+                        9.19  , 4.44  , 1.34 , 4.56
+                        ), nrow = 4)
+```
+
+### Eigenvectors and eigenvalues
+```{r}
+res <- eigen(covariances)
+cat("Eigenvectors:\n")
+print(res$vectors)
+cat("\nEigenvalues:\n")
+print(res$values)
+```
+### Number of components
+By *Kaiser rule*:
+```{r}
+tot_var <- sum(diag(covariances)) # The same as sum(res$values)
+cat("Total variance ", tot_var)
+mean_var <- tot_var/length(res$values)
+cat("\nMean variance ", mean_var)
+acc <- cumsum(res$values)
+cat("\nVariance by each component and accumulated variance:\n")
+t(matrix(c(res$values, acc), ncol = 2))
+```
+
+By *Scree plot*:
+```{r}
+barplot(res$values, names.arg=1:length(res$values), 
+       main = "Variances",
+       xlab = "Principal Components",
+       ylab = "Percentage of variances",
+       col ="steelblue")
+lines(x = 1:length(res$values), res$values, 
+      type="b", pch=19, col = "red")
+```
+
+### Principal components:
+Projection of the data into the axis defined by the eigenvectors. We will use two
+components.
+
+$$
+\begin{align*}
+Y_1 &= 0.8328499X_1+ 0.5029292X_2 0.1362074X_3+ 0.1867372X_4 \\
+Y_2 &= 0.50952549X_1-0.85525961X_2-0.05883247X_3+ 0.07384800X_4
+\end{align*}
+$$
+### Interpretation:
+1. The first component is the variable with maximum variance with positive coefficients.
+We can interpret it as *size* of the student.
+2. The second component has positive coefficients with the first and forth variable and
+negative with the others. We can interpret it as *form* of the student.
+
+The first component is ordering the students by its *size*, from shorter to larger.
+While the second component provides an ordering of the students by its *form*, from
+smaller to bigger/athletic.
+
+*size* and *form* are uncorrelated.
+
+## Example: Runners
+We have collected partial running times (minutes) from 12 runners in 16 km distance.
+Having the runner number 5 as the fastest and the number 12 as the slowest.
+The data is as follows:
+![runners](img/table_runners.png)
+
+
+
+```{r}
+runners <- matrix(
+  c(
+    10, 10, 13, 12,
+    12, 12, 14, 15,
+    11, 10, 14, 13,
+    9, 9, 11, 11,
+    8, 8, 9, 8,
+    8, 9, 10, 9,
+    10, 10, 8, 9,
+    11, 12, 10, 9,
+    14, 13, 11, 11,
+    12, 12, 12, 10,
+    13, 13, 11, 11,
+    14, 15, 14, 13
+  ),
+  nrow = 12,
+  ncol = 4,
+  byrow = TRUE
+)
+```
+
+Perform an analysis of the principal components and obtain:
+1. Descriptive statistics: scatterplots, means, covariances, etc.
+2. Computation of the correlation matrix, plots it.
+3. Eigenvectors and eigenvalues in a table and the variance explained by each one.
+4. Select the number of components by Kaiser method or the scree plot method.
+5. Compute the principal components.
+6. Interpretation of the principal components.
+7. Biplot of the data and interpretation.
+8. Compute contributions and square cosine of the individuals. Interpret them.
+9. Compute contributions and square cosine of the variables. Interpret them.
+
+
+## Using the FactoMineR and factoextra packages
+
+We go directly to step 3 onwards.
+```{r}
+library("FactoMineR") # PCA and related methods
+library("factoextra") # Visualizations and others for FactoMineR methods.
+res <- PCA(runners, graph = F)
+```
+
+
+### Eigenvalues and eigenvectors
+```{r}
+eigenvalues <- res$eig
+print(eigenvalues)
+```
+
+### Screeplot
+```{r}
+fviz_screeplot(res, ncp=10)
+```
+
+### Extracting information from individuals and variables using coordinates, contributions and square cosines
+
+#### Variables
+Coordinates of the variables on the factor space
+```{r}
+res$var$coord
+```
+
+Squared cosines: Quality of the projected variables
+```{r}
+res$var$cos2
+```
+Correlations between variables and principal components gives us a way to interpret
+the principal components:
+```{r}
+res$var$cor
+```
+
+Contributions of the variables to the principal components:
+```{r}
+res$var$contrib
+```
+
+Plot of the variables on the factor space
+```{r}
+fviz_pca_var(res, choix="var", col.var="contrib")
+```
+
+#### Individuals
+Coordinates of the individuals on the factor space:
+```{r}
+res$ind$coord
+```
+
+Square cosines
+```{r}
+res$ind$cos2
+```
+
+Contributions to each principal component
+```{r}
+res$ind$contrib
+```
+
+Plot of the individuals onto the factor space:
+```{r}
+fviz_pca_ind(res, geom="text")
+```
+
+### Description of the dimensions through the correlations and significance level
+```{r}
+desc <- dimdesc(res, axes =c(1,2))
+desc
+```
+
+### Biplot representation (individuals and variables together)
+```{r}
+fviz_pca_biplot(res, repel=TRUE)
+```
+
+### Interpreting the results
+1. The first component is nearly equal through all the variables. It can be interpreted as
+the time to finish the race. If we think on terms of $Y_1$, we can think about it 
+as the *speed* to finish the race.
+2. The second component has opposite signs between the first two coefficients and the
+last two. This highlight the difference about runners that go slow at the start of the
+race and then fast and viceversa. We can interpret this component as running *style*
+3. *Speed* and *style* are uncorrelated, so having one *style* or another do not 
+influences the *speed* in which the race is performed.

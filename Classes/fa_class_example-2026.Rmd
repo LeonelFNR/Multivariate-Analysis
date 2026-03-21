@@ -1,0 +1,225 @@
+---
+title: "Factor Analysis"
+author: "Jamie Arjona"
+date: "2026-03-11"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(psych)
+library(GGally)
+```
+
+
+
+# The FA model
+Code that shows how to compute the factor model using R different libraries.
+
+## Data
+Data consists on exams grades in differents subjects. In some of the exams, students
+were able to use the course book (marked as O).
+```{r}
+data <- read.table("data/FA_BookOpenClosed.dat")
+cnames <- c("mechanics (C)", "vectors (C)", "algebra (O)", "analysis (O)", "statistics (O)")
+colnames(data) <- cnames
+head(data)
+summary(data)
+ggpairs(data, progress=FALSE)
+X <- as.matrix(data)
+```
+
+## Factor analysis in base R: factanal function
+The *factanal* function from STATS package (included in R) performs maximum likelihood
+estimate of the FA model. We can choose to do different rotations, (e.g. varimax,
+promax, etc.). The scores are calculated by Bartlett method or regression 
+(Thurstone/Thomson).
+```{r}
+# ?factanal
+res.ml <- factanal(X, factors=2, rotation="none", scores="Bartlett")
+print(res.ml)
+
+```
+
+Understanding loadings:
+```{r}
+res.ml$loadings
+# communalities: the link between variable variance and factor contribution to it
+diag(res.ml$loadings %*% t(res.ml$loadings)) 
+# If entries of loadings matrix get squared then the row marginal are the loadings
+# and the column marginals are the factors variance.
+colSums(res.ml$loadings**2) # communalities
+1-res.ml$uniquenesses
+rowSums(res.ml$loadings**2) # sum of squares of loadings
+
+
+
+# We want to recover the correlation matrix with few variables
+(LLt <- res.ml$loadings%*%t(res.ml$loadings))
+cor(X)
+LLt +diag(res.ml$uniquenesses)
+```
+
+The obtained loadings are ugly and not interpretable at all, we can do better
+just rotating the loadings
+```{r}
+res.ml$loadings
+varimax(res.ml$loadings)
+res.ml.varimax <- factanal(X, factors=2, rotation="varimax", scores="Bartlett")
+print(res.ml.varimax$loadings)
+
+# communalities, sum of squared loadings and uniqueness do not change
+res.ml.varimax$loadings %*% t(res.ml.varimax$loadings)
+LLt
+all.equal(res.ml.varimax$uniquenesses, res.ml$uniquenesses)
+
+```
+
+## fa method from psych library
+This library implements other methods to estimate FA beyond maximum likelihood and
+also permits to use other rotations such as **oblimin**.
+
+**Note**: the complexity, *com* column, should not be confused with the communalities.
+```{r}
+#?fa
+res.fa <- fa(X, nfactors=2, rotate="none", scores="Bartlett")
+print(res.fa)
+res.fa.varimax <- fa(X, nfactors=2, rotate="varimax", scores="Bartlett")
+print(res.fa.varimax)
+res.fa.oblimin <- fa(X, nfactors=2, rotate="oblimin", scores="Bartlett")
+print(res.fa.oblimin)
+```
+
+
+
+Observe that **oblimin* returns three matrices:
+```{r}
+(P <- unclass(res.fa.oblimin$loadings))
+(S <- unclass(res.fa.oblimin$Structure))
+(Phi <- unclass(res.fa.oblimin$Phi))
+(T_mat <- res.fa.oblimin$rot.mat)
+
+print("Structure matrix equal to matrix multiplication of simple structure with correlations:")
+all.equal(P%*%Phi, S)
+
+print("Correlation matrix computed from rotation matrix:")
+manual_phi <- solve(t(T_mat)%*%T_mat)
+Phi
+manual_phi
+```
+
+We want the p-value to be large, so we don't reject the null hypothesis
+```{r}
+res.fa$PVAL
+res.fa.varimax$PVAL
+res.fa.oblimin$PVAL
+```
+
+
+Thurstone factor scores:
+```{r}
+res.fa.thurstone <- fa(X, nfactors=2, rotate="none", scores="Thurstone")
+W <- scale(X)%*%solve(cor(X))
+
+all.equal(head(W%*%res.fa.thurstone$loadings), head(res.fa.thurstone$scores))
+
+
+```
+
+Bartlett factor scores
+```{r}
+psi <- diag(res.fa.varimax$uniquenesses)
+W.pre <- solve(psi)%*%res.fa.varimax$loadings
+W.post <- solve(t(res.fa.varimax$loadings)%*%solve(psi)%*%res.fa.varimax$loadings)
+W <- W.pre %*% W.post
+
+all.equal(head(scale(X)%*%W),head(res.fa.varimax$scores))
+```
+
+We can use the Scorings for ANOVA or regression tasks:
+```{r}
+head(res.fa.oblimin$scores)
+res.fa.oblimin$score.cor
+# how well factor scores represent theoretical latent factors, want those to be
+# as close as possible to 1:
+res.fa.oblimin$r.scores
+```
+
+We can explore the scores in a biplot:
+```{r}
+biplot(res.fa, 
+       main = "Biplot of Factor Analysis NO rotation",
+       col = c("blue", "red"),
+       pch = 16,
+       cex = 0.8)
+biplot(res.fa.varimax, 
+       main = "Biplot of Varimax Factor Analysis",
+       col = c("blue", "red"),
+       pch = 16,
+       cex = 0.8)
+biplot(res.fa.oblimin, 
+       main = "Biplot of Oblimin Factor Analysis",
+       col = c("blue", "red"),
+       pch = 16,
+       cex = 0.8)
+```
+
+
+## The PCA method
+We can compute the loadings using the PCA (warning: not all FA conditions are
+met)
+```{r}
+Xs <- scale(X, center=TRUE, scale=TRUE)
+n <- nrow(Xs)
+R <- 1/(n-1)* t(Xs)%*%Xs
+res.pca <- eigen(R)
+D <- sqrt(diag(res.pca$values))
+m <- 2
+L <- res.pca$vectors[,1:m]%*%D[1:2,1:m]
+colnames(L)<- cnames[1:m]
+SSL <- diag(t(L)%*%L)
+gof <- sum(diag(D)[1:m])/sum(diag(D))
+# j$loadings
+comms <- rowSums(L**2)
+specific <- 1 - comms # since variances are scaled they are 1
+SSL
+round(gof,3)
+comms
+specific
+
+# Compare with previous methods
+cor(Xs)
+L%*%t(L)+diag(specific)
+LLt + diag(res.ml$uniquenesses)
+# P%*%Corrs%*%t(P) + Psi
+res.fa.oblimin$loadings%*%res.fa.oblimin$Phi%*%t(res.fa.oblimin$loadings) + diag(res.fa.oblimin$uniquenesses)
+
+# sanity check: Sum of squared loadings, loadings, specificity
+# res.pca.check <- principal(R, nfactors=2, rotate="none")
+# sum of squared loadings: 
+# res.pca.check$values
+# loadings:
+# res.pca.check$loadings
+# specificity
+# res.pca.check$uniqueness
+```
+
+The varimax command from STATS (base R) performs the varimax rotation on the loadings
+matrix:
+```{r}
+res.pca.rot <- varimax(L)
+print(res.pca.rot$loadings)
+print(res.pca.rot$rotmat)
+
+# sanity check principal(R, nfactors=2, rotate="varimax")
+```
+
+They key is to understand that FA is a **causal model**:
+```{r}
+fa.diagram(res.fa.varimax)
+fa.diagram(res.fa.oblimin)
+```
+

@@ -1,0 +1,125 @@
+---
+title: "fda examples"
+author: "Jamie Arjona"
+date: "2024-05-02"
+output: pdf_document
+---
+Libraries
+```{r}
+library(psych) # all fa methods
+library(readr)
+library(tidyverse)
+```
+
+
+```{r}
+data <- read_csv("data/expenses.csv")
+row_names <- data %>% select(1) %>% as.list
+X <- data %>% select(bread, vegetables, fruits,  meat, poultry,  milk,  wine) %>% as.matrix
+n <- dim(X)[1]
+p <- dim(X)[2]
+```
+```{r}
+library(calibrate) # biplot
+```
+
+
+Let's perform FA without rotation.
+```{r}
+out.ml <- factanal(X, factors=2, rotation="none", scores="Bartlett") # MLE
+print(out.ml)
+```
+
+Biplot:
+```{r}
+ze <- rep(0, p)
+plot(out.ml$loadings,type="n",xlim=c(-1,1),ylim=c(-1,1))
+text(out.ml$loadings,labels=colnames(X), col="blue")
+arrows(ze, ze, out.ml$loadings[,1], out.ml$loadings[,2], length = 0.07,col="blue")
+abline(h=0,v=0,col="gray")
+circle(1)
+```
+
+
+
+Next, we are going to try to interpret the data from the rotated factors:
+```{r}
+out.rotated <- factanal(X, factors=2, rotation="varimax", scores="Bartlett")
+print(out.rotated)
+```
+
+
+Biplot:
+```{r}
+ze <- rep(0, p)
+plot(out.rotated$loadings,type="n",xlim=c(-1,1),ylim=c(-1,1))
+text(out.rotated$loadings,labels=colnames(X), col="blue")
+arrows(ze, ze, out.rotated$loadings[,1], out.rotated$loadings[,2], length = 0.07,col="blue")
+abline(h=0,v=0,col="gray")
+circle(1)
+```
+
+# Using Psych library
+The psych library offers the *fa* function which provides five different methods 
+to perform factor analysis: minimum residual, principal factor, weighted least squares,
+generalized least squares and maximum likelihood factor analysis.
+
+**principal** gives us FA from PCA
+```{r}
+fa.principal <- principal(X, nfactors= 2, rotate="varimax", scores=TRUE)
+print(attributes(fa.principal))
+```
+And the results are:
+```{r}
+print(fa.principal$loadings)
+print(fa.principal$scores)
+
+print(fa.principal$communality) # sum of squares of loadings for each variable
+print(fa.principal$uniquenesses) # 1 - communality for each variable.
+print(fa.principal$rot.mat)
+
+```
+Using Principal Factor analysis
+```{r}
+fa.pfa <- fa(X, nfactors= 2, rotate="varimax", scores=TRUE, fm="pa")
+print(attributes(fa.pfa))
+```
+Be careful, the library warns us about a Heywood case (statistic assumptions not 
+satisfied, i.e.: negative variances or correlation estimates greater than 1)
+
+```{r}
+print(fa.pfa$loadings)
+print(fa.pfa$scores)
+
+print(fa.pfa$communality) # sum of squares of loadings for each variable
+print(fa.pfa$uniquenesses) # 1 - communality for each variable.
+print(fa.pfa$rot.mat)
+```
+Using psych with maximum likelihood estimates
+```{r}
+fa.psych.ml <- fa(X, nfactors= 2, rotate="varimax", scores=TRUE, fm="ml")
+print(attributes(fa.psych.ml))
+```
+
+And the results:
+```{r}
+print(fa.psych.ml$loadings)
+print(fa.psych.ml$scores)
+
+print(fa.psych.ml$communality) # sum of squares of loadings for each variable
+print(fa.psych.ml$uniquenesses) # 1 - communality for each variable.
+print(fa.psych.ml$rot.mat)
+```
+# Interpretation of the data
+In general, the two factors are making a distinction about milk and bread vs fruits, meat and poultry.
+The first factor makes a distinction of wine vs the rest of the variables so we can
+interpret this factor as occasional use vs daily use. The problem comes from the
+fact that wine is not well represented with two factors (should we add a third factor?)
+The second factor becomes evident once one uses the CHILDREN variable and becomes clear
+that the expanses on bread and milk is closely related to the number of childrens.
+
+# Exercise
+Replicate the results from principal of the psych library starting with eigen on 
+the covariance (or correlation) matrix and varimax from the default package stats.
+Take into account that you will need to perform an inverse matrix calculation 
+(solve or ginv functions) and multiply some matrices.

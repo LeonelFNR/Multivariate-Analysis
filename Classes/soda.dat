@@ -1,0 +1,11 @@
+"Soda" "Diet.Pepsi" "RC" "Yukon" "Dr.Pepper" "Shasta" "Coca.Cola" "Diet.Dr.Pepper" "TAB" "Pepsi" "Diet.Rite"
+"1" "Diet.Pepsi" 0 35 79 86 76 63 58 62 66 26
+"2" "RC" 35 0 54 56 30 41 86 81 24 61
+"3" "Yukon" 79 54 0 70 51 38 78 72 69 70
+"4" "Dr.Pepper" 86 56 70 0 66 90 50 89 66 89
+"5" "Shasta" 76 30 51 66 0 35 76 68 23 63
+"6" "Coca.Cola" 63 41 38 90 35 0 77 54 35 68
+"7" "Diet.Dr.Pepper" 58 86 78 50 76 77 0 66 77 59
+"8" "TAB" 62 81 72 89 68 54 66 0 71 34
+"9" "Pepsi" 66 24 69 66 23 35 77 71 0 59
+"10" "Diet.Rite" 26 61 70 89 63 68 59 34 59 0

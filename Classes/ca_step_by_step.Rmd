@@ -1,0 +1,399 @@
+---
+title: "CA_step_by_step"
+author: "Jamie Arjona"
+date: "2025-03-09"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Canonical Correlation Analysis
+Analysis of the two way table obtainable by comparing two categorical variables.
+Input: Given a two-way table (contingency table)
+Goal: Visualization and interpretation of relationships between rows and columns. 
+How categories are related based on their deviations from independence.
+Can be interpreted as PCA for categorical variables.
+
+## Data
+We have 5 different species of insects:
+Ladybugs, caterpillars, weevils, aphids and spiders
+From 3 different public parks in the city:
+A, B and C.
+Populations of bugs are represented in the following two way table:
+
+```{r}
+ladybugs <- c(38,28,29)
+caterpillars <- c(113,123,85)
+weevils <- c(116,91,90)
+aphids <- c(80,46,57)
+spiders <- c(38,24,42)
+data <- matrix(c(ladybugs, caterpillars, weevils, aphids, spiders), nrow=3)
+tdata <- as.table(data)
+park_names <- c("A","B","C")
+bug_names <- c("ladybugs", "caterpillars", "weevils", "aphids", "spiders")
+rownames(tdata) <- park_names
+colnames(tdata) <- bug_names
+tdata
+N <- tdata # notation
+I <- nrow(tdata)
+J <- ncol(tdata)
+```
+
+**Goal**:
+Are there differences in the distributions of the insects across the public parks?
+
+*Note*: We can represent our data as the number of dimension for CA will be I-1=2
+from min(I-1, J-1).
+
+## Obtain correspondence matrix and profiles matrices
+Correspondence matrix: Matrix of probabilities.
+Profile: Vector that sums up to 1 (also know as frequency vectors)
+```{r}
+ones_r <- rep(1,I)
+ones_c <- rep(1,J)
+n <- t(ones_r) %*% N %*% ones_c
+n
+n <- as.integer(n)
+```
+
+Correspondence matrix:
+```{r}
+P <- N / n
+P
+# sanity check
+t(ones_r) %*% P %*% ones_c
+r <- P%*%ones_c # row masses
+c <- t(P)%*% ones_r # column masses
+r
+c
+# diagonal matrices for later
+Dr <- diag(c(r))
+Dc <- diag(c(c))
+```
+
+Profile matrices
+```{r}
+# Row profiles and its column marginal
+R <- solve(Dr)%*%P
+rownames(R) <- park_names
+# Column profiles and its row marginal
+C <- solve(Dc)%*%t(P)
+C <- t(C)
+colnames(C) <- bug_names
+
+R
+R %*% ones_c # row profiles so its row marginals are 1
+C
+ones_r %*% C # column profiles so its column marginals are 1
+# sanity check (masses (marginals from P) as weighted averages of the profiles)
+all.equal(t(r)%*%R, t(c))
+all.equal(t(ones_r)%*%P, t(c))
+
+all.equal(t(c)%*%t(C), t(r))
+all.equal(t(ones_c)%*%t(P), t(r))
+```
+We can calculate the contingency ratio. It indicates how many times the entry is
+greater or smaller than the respective masses. It must be the same for row profile and
+column profile.
+```{r}
+all.equal(C[1,1] / r[1], R[1,1] / c[1])
+solve(Dr)%*%C
+R%*%solve(Dc)
+```
+
+## Ternary plots
+Visualization of the ternary plot. Ternary plots work when the cumulative sum of
+the elements in a vector is 1, e.g.: compositional data or profile vectors.
+They make easy to interpret:
+- Distances between points: Relations between categories of both cat. variables.
+- Inertia: How spread are the points wrt to the center. Low inertia means independence
+in the chi-square test for independence.
+It works for C and R as have marginals that sum up to 1 (rows for C and columns 
+for R).
+Reshape the data so we have as columns the cateogrical variable with 3 categories.
+
+```{r}
+# install.packages("ggtern")
+library(ggtern)
+df_C <- data.frame(A=C[1,], B=C[2,], C=C[3,], lab=bug_names)
+df_R <- data.frame(A=R[1,], B=R[2,], C=R[3,], lab=bug_names)
+
+ggtern(data = df_C, aes(x = A, y = B, z = C)) +
+  geom_point(shape=1, size=4, color="red") +
+  geom_text(aes(label = 1:nrow(df_C))) +
+  theme_rgbw() + 
+  theme_showarrows() +
+  theme_clockwise() +
+  ggtitle("Columns profile") + 
+  xlab("A") +
+  ylab("B") +
+  zlab("C")
+
+df_R <- data.frame(A=R[1,], B=R[2,], C=R[3,], lab=bug_names)
+ggtern(data = df_R, aes(x = A, y = B, z = C)) +
+  geom_point(shape=1, size=4, color="red") +
+  geom_text(aes(label = 1:nrow(df_R))) +
+  theme_rgbw() + 
+  theme_showarrows() +
+  theme_clockwise() +
+  ggtitle("Columns profile") + 
+  xlab("A") +
+  ylab("B") +
+  zlab("C")
+```
+In the ternary plots we can show the massess and the coordiantes of the points.
+We can think of the average profile as a special point as it is the centroid of 
+a weighted average (rows or columns) and it is situated at the center of the 
+profiles but more attracted to those with more weight. 
+Observe that the average of the data will be always at the center of the ternary 
+plot, i.e.: c(1/3,1/3,1/3).
+In general, centroid or barycenter is an alternative term for the weighted average.
+In Correspondence Analysis the weighted average gives the average profile and the
+weights used to compute the weighted average is what is call the mass. E.g.:
+In the row profile, we have the row margin as the masses and the column margin
+as the average row profile (it is the result of dividing each row by its corresponding
+row marginal and sum it up).
+
+Next we show that in column profiles, the row marginal represent the average 
+column profile:
+```{r}
+C_ext <- cbind(C,r)
+colnames(C_ext) <- c(bug_names, "r_avg")
+df_C_ext <- data.frame(A=C_ext[1,], B=C_ext[2,], C=C_ext[3,], lab=c(bug_names, "r_avg"))
+gp <- ggtern(data = df_C_ext, aes(x = A, y = B, z = C, color = lab)) +
+  geom_point(shape = ifelse(df_C_ext$lab == "r_avg", 4, 1), size = 3) + 
+  geom_text(aes(label = lab), vjust = -0.5) + 
+  scale_color_manual(values = c("r_avg" = "red")) +
+  theme_rgbw() +
+  theme_showarrows() +
+  theme_clockwise() +
+  ggtitle("Columns profile") +
+  xlab("A") +
+  ylab("B") +
+  zlab("C") +
+  theme(legend.position = "one")
+gp
+```
+
+
+## Chi-square distances
+Used to compute variation on the data of a contingency table.
+The key concept in Correspondence Analysis is the use of the Chi-square distance.
+The Chi-square distance is a weighted Euclidean distance. The weights are the 
+inverse of the masses so a low mass component indicates a rare category and has
+a higher contribution.
+In the Chi square test of homogeneity, independence (homogeneity) means that the 
+discrepancies between observed and expected frequencies are small. If this does 
+not holds, there is a dependence and this is measure through a test statistic
+(the chi square statistic) that follows a chi square distribution.
+chi square distance = sum (observed - expected)^2 / expected
+The geometric interpretation is considering the concept of inertia: how far are
+observations from the average.
+inertia = sum_i (ith row mass) (chi square distance from ith profile to average profile)^2
+Inertia will be high when row profiles have large deviatinos from their average 
+profile and low if close.
+Inertia can be also considered as a correlatin between categories of the variables:
+The higher the inertia, the closer the row profiles to the vertices of a ternary
+plot, i.e.: closer the categories between the categorical variables.
+Interpretation of minimum and maximum inertia:
+Minimum inertia is 0: All profiles are equal to their respective average profile.
+Maximum inertia is equal to the number of dimensions of the space profile (remember 
+that is min(I-1, J-1)).
+
+First, the chi-square statistic as a measure of deviations from the average using
+the contingency table.
+Chi-square test review:
+The chi square test measures the deviations from the means (row or column masses) 
+of the cells. 
+Each cell contributes towards the chi square statistic. 
+The chi square statistic follows a chi square distribution with(I-1)x(J-1) degrees of freedom.
+```{r}
+# In R, just one call:
+chisq.test(N)
+
+# Chi square statistic computation for rows (we need to recover original counts):
+Er <- matrix((c*n) %o%r, ncol = J, byrow = TRUE)
+Ec <- matrix((r*n) %o%c, ncol = J)
+all.equal(Er,Ec) # (c[j]/n)*r[i] == c[j]*(r[i]/n)
+chisq_contributions <- ((N-Er)**2/Er)
+round(chisq_contributions,3)
+chisq = sum(chisq_contributions)
+dof <- (I-1)*(J-1)
+pval <- 1-pchisq(chisq, df=8)
+
+# Turns out that the chi square statistic uses a weighted euclidean distance
+# called the chi square distance and that what we do is calculate the inertia,
+# the deviations (distance of each cell) from the corresponding mean.
+
+# define a function for computing the chi square distance
+squared_chi_square_distance <- function(x, y, m) {
+  if (length(x) != length(y)) {
+    stop("Vectors must have the same length.")
+  }
+  # Avoid division by zero by adding a small constant
+  epsilon <- 1e-10
+
+  chi_sq <- 0
+  for (i in 1:length(x)) {
+    chi_sq <- chi_sq + ((x[i] - y[i])**2 / (m[i] + epsilon))
+  }
+  chi_sq <- as.numeric(chi_sq)
+  return(chi_sq)
+}
+
+total_inertia_by_row <- function(Q, cq, rq) {
+  # expects a row profiles matrix and the average row and column profile.
+  # TODO: generalize to input N and add argument byrows.
+  
+  if (sum(rowSums(Q))!=nrow(Q)) {
+    stop("Not a row profiles matrix.")
+  }
+  
+  tot_inertia <- 0
+  for (i in 1:nrow(Q)){
+    tot_inertia <- tot_inertia + rq[i] * squared_chi_square_distance(Q[i,], cq, cq)
+  }
+  return(tot_inertia)
+}
+
+total_inertia_by_col <- function(Q, cq, rq) {
+  # expects a row profiles matrix and the average row and column profile.
+  # TODO: generalize to input N and add argument byrows.
+  
+  if (sum(colSums(Q))!=ncol(Q)) {
+    stop("Not a row profiles matrix.")
+  }
+  
+  tot_inertia <- 0
+  for (i in 1:ncol(Q)){
+    tot_inertia <- tot_inertia + cq[i] * squared_chi_square_distance(Q[,i], rq, rq)
+  }
+  return(tot_inertia)
+}
+
+# sanity check
+# library(vegan)
+# all.equal(vegdist(N, method="chisq")[1], sqrt(squared_chi_square_distance(R[1,], R[2,], c)))
+
+
+tot_inerR <- total_inertia_by_row(R, c, r)
+tot_inerC <- total_inertia_by_col(C, c, r)
+all.equal(tot_inerR, chisq / n)
+all.equal(tot_inerC, chisq / n)
+```
+
+Now, chi square distance with profiles
+```{r}
+# Distances between column profiles
+sqrt(squared_chi_square_distance(C[,1],C[,1], r))
+sqrt(squared_chi_square_distance(C[,1],C[,2], r))
+sqrt(squared_chi_square_distance(C[,1],C[,3], r))
+sqrt(squared_chi_square_distance(C[,1],C[,4], r))
+sqrt(squared_chi_square_distance(C[,1],C[,5], r))
+
+# Distances between row profiles
+sqrt(squared_chi_square_distance(R[1,],R[1,], c))
+sqrt(squared_chi_square_distance(R[1,],R[2,], c))
+sqrt(squared_chi_square_distance(R[1,],R[3,], c))
+```
+
+
+
+### Example visualization of the inertia
+Visualize that the inertia concept is analogous to spread of the categories.
+```{r}
+table1 <- matrix(c(21,20,19,20,21,19,20,19,20,19,19,22,20,21,20), nrow = 5, byrow = TRUE)
+colnames(table1) <- c("A", "B", "C")
+rownames(table1) <- 1:5
+table2 <- matrix(c(23,18,19,16,24,20,24,17,18,17,19,18,20,22,15), nrow = 5, byrow = TRUE)
+colnames(table2) <- c("A", "B", "C")
+rownames(table2) <- 1:5
+table3 <- matrix(c(27,15,13,13,30,14,29,15,12,16,18,45,15,22,16), nrow = 5, byrow = TRUE)
+colnames(table3) <- c("A", "B", "C")
+rownames(table3) <- 1:5
+table4 <- matrix(c(30,11,10,10,34,11,34,12,10,12,10,57,14,33,12), nrow = 5, byrow = TRUE)
+colnames(table4) <- c("A", "B", "C")
+rownames(table4) <- 1:5
+
+table1
+table2
+table3
+table4
+```
+As ternary plots:
+```{r}
+library(gridExtra)
+
+plot_tables <- function(data_table, title){
+  df <- as.data.frame(data_table)
+  df$id <- rownames(df)
+  gp <- ggtern(data = df, aes(x = A, y = B, z = C)) +
+  geom_point() +
+  geom_text(aes(label = id), vjust = 1) +
+  ggtitle(title)+
+  xlab("A") +
+  ylab("B") +
+  zlab("C")
+  gp
+}
+
+
+gp1 <- plot_tables(table1, "Inertia ")
+gp2 <- plot_tables(table2, "Inertia ")
+gp3 <- plot_tables(table3, "Inertia ")
+gp4 <- plot_tables(table4, "Inertia ")
+grid.arrange(gp1,gp2, gp3, gp4)
+```
+In the upper left plot the inertia is small, i.e.: variables are independent.
+In the bottom right plot the inertia is high, i.e.: variables are homogeneous.
+In the extreme case of maximal inertia we can consider that the variables are the
+same.
+
+## The correspondence analysis
+Now we are ready to perform correspondence analysis.
+The **ca** package performs simple correspondence analysis given a contingency 
+table N or correspondence table P.
+It will perform all calculations and computations explained in the slides and we
+can access all of them easily.
+Also it allows easy visualization of biplots.
+```{r}
+library(ca) # simple correspondence analysis
+res <- ca(P)
+print(res)
+summary(res)
+res$sv # Why we have only two?
+res$nd
+res$rowinertia
+res$colinertia
+res$rowcoord
+res$colcoord
+res$rowmass
+res$colmass
+res$rowdist # are squared chi square distances, they need to be transformed by sqrt
+res$coldist # are squared chi square distances, they need to be transformed by sqrt
+```
+
+Biplots:
+```{r}
+plot.ca(res, map="rowprincipal", arrows=c(FALSE,TRUE), main="Row profiles biplot", mass=TRUE)
+plot.ca(res, map="colprincipal", arrows=c(TRUE,FALSE), main="Column profiles biplot", mass=TRUE)
+plot.ca(res, map="symmetric", arrows=c(FALSE,FALSE), main="Symmetric biplot", mass=TRUE)
+```
+
+We can also check the contributions by color gradient:
+```{r}
+plot.ca(res, map="symmetric", arrows=c(FALSE,FALSE), mass=TRUE, contrib = "relative")
+```
+
+We can add supplementary individuals:
+```{r}
+wasps <- c(0.7,0.2,0.1)
+Dpark <- c(0.1,0.2,0.04,0.05,0.25,0.3)
+P.ext <- cbind(P, wasps)
+P.ext <- rbind(P.ext, Dpark)
+res.ext <- ca(P.ext, supcol=6, suprow=4)
+plot.ca(res.ext, map="symmetric", arrows=c(FALSE,FALSE))
+```
+
