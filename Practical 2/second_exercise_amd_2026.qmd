@@ -76,6 +76,9 @@ For this exercise, libraries that automate the computation of PCA are permitted:
     There a size in effect actually. If we inspect the plot we can see that PC1 explains 92.3% of the variance, while the other components explain 4.1, 2.9 and 0.7% respectively. This is evidence that there is a variable with a much greater variance and that it's dominating de PCA. Inspecting the dataset, we can suspect that the causing variable is "Price", since it usually achieves bigger values compared to the other variables. To correct this effect, the variables must be standardized before applying PCA. Therefore, from this point on, the analysis should be based on the PCA computed with scaled variables.
 
     ```{r}
+    # Comparing the variance of variables
+    diag(cov(data2))
+
     res.pca <- PCA(data2, scale.unit = TRUE, graph = FALSE)
     res.pca$eig
     ```
@@ -236,110 +239,213 @@ For this exercise, libraries that automate the computation of PCA are permitted:
 
     Based on the PCA plot, the restaurant that best satisfies the desired conditions is **Tony's Di Napoli**. The first principal component represents the overall level of the restaurant, including price. Since the restaurant is located on the negative side of Dim1, it indicates a relatively lower price. The second principal component contrasts decoration with food and service; Tony's Di Napoli lies on the negative side of Dim2, suggesting stronger emphasis on food quality and service rather than decoration. Therefore, this restaurant matches the requirements of good food, good service, low concern for decor, and relatively low price.
 
-## Factor Analysis
+    ## Factor Analysis
 
-The dataset *attitude* represents a survey of clerical employees (clerks) in 30 large financial institutions, measuring their "attitude" toward their workplace. The data are aggregated from the questionnaires of the approximately 35 employees for each of 30 randomly selected departments. The numbers give the percent proportion of favorable responses to seven questions in each department. The variables are: - Rating: (Target variable). Overall rating of the department by its employees. It's how happy or satisfied the employees are. - Complaints: Feel about how well complaints are handled by the management. - Privileges: Feel about how the management allows for special privileges. - Learning: Feel about to opportunities to learn new skills and grow within the role. - Raises: Perception about pay raises are based on meritocracy rather than seniority or favoritism - Critical: Feel about how much the department focuses on mistakes. - Advance: Perception about promotion or advancement within the organization.
+    The dataset *attitude* represents a survey of clerical employees (clerks) in 30 large financial institutions, measuring their "attitude" toward their workplace. The data are aggregated from the questionnaires of the approximately 35 employees for each of 30 randomly selected departments. The numbers give the percent proportion of favorable responses to seven questions in each department. The variables are:
 
-The goal is to perform factorial analysis on this dataset and compare results from different methods of FA with Varimax rotation and also to interpret the most probable factors within the data.
+    -   Rating: (Target variable). Overall rating of the department by its employees. It's how happy or satisfied the employees are.
 
-```{r}
-library(psych)
-data(attitude)
-X <- attitude
-n <- nrow(X)
-p <- ncol(X)
-Xs <- scale(X)
-R <- 1/(n-1)*t(Xs)%*%Xs
+    <!-- -->
 
-res.eig <- eigen(R)
-D <- diag(res.eig$values)
-V <- res.eig$vectors
-```
+    -   Complaints: Feel about how well complaints are handled by the management.
 
-1.  Compute the PCA approach to Factor Analysis:
+    <!-- -->
 
--   Decide the number of factors and compute the loadings.
+    -   Privileges: Feel about how the management allows for special privileges.
 
-```{r pcafa_factors_and_loadings}
+    <!-- -->
 
-```
+    -   Learning: Feel about to opportunities to learn new skills and grow within the role.
 
--   Compute communalities.
+    <!-- -->
 
-```{r pcafa_communalities}
+    -   Raises: Perception about pay raises are based on meritocracy rather than seniority or favoritism
 
-```
+    <!-- -->
 
--   Compute uniqueness (unique variances).
+    -   Critical: Feel about how much the department focuses on mistakes.
 
-```{r pcafa_uniqueness}
+    <!-- -->
 
-```
+    -   Advance: Perception about promotion or advancement within the organization.
 
--   Perform a varimax rotation (*?varimax*) and interpret the factors.
+    The goal is to perform factorial analysis on this dataset and compare results from different methods of FA with Varimax rotation and also to interpret the most probable factors within the data.
 
-```{r pcafa_varimax}
+    ```{r}
+    library(psych) 
+    data(attitude) 
+    X <- attitude 
+    n <- nrow(X) 
+    p <- ncol(X) 
+    Xs <- scale(X) 
+    R <- 1/(n-1)*t(Xs)%*%Xs  
+    res.eig <- eigen(R) 
+    D <- diag(res.eig$values) 
+    V <- res.eig$vectors
+    ```
 
-```
+    1.  Compute the PCA approach to Factor Analysis:
 
--   Compute the factor scores by Thomson-Thurstone
+    -   Decide the number of factors and compute the loadings.
 
-```{r pcafa_scores}
+    ```{r pcafa_factors_and_loadings}
 
-```
+    cumsum(res.eig$values)/sum(res.eig$values)
 
-2.  Compute the Maximum Likelihood Estimation approach to Factor Analysis using the `fa` method from the `psych` library using the argument **fm="ml"**:
+    plot(1:7, res.eig$values, type = "b")
 
--   Decide the number of factors and provide the loadings.
+    m <- 2
 
-```{r ml_factors_and_loadings}
-?fa
-```
+    L_PCA <- V[,1:m] %*% sqrt(D[1:m,1:m])
+    L_PCA
+    ```
 
--   Give communalities.
+    The first two components explain approximately 70% of the total variance, and the scree plot shows a clear elbow at the second eigenvalue. Therefore, we select **m = 2** factors.
 
-```{r ml_communalities}
+    -   Compute communalities.
 
-```
+    ```{r pcafa_communalities}
 
--   Give the unique variances
+    h <- apply(L_PCA, 1, function(row) sum(row^2))
+    h
+    ```
 
-```{r ml_unique_variances}
+    -   Compute uniqueness (unique variances).
 
-```
+    ```{r pcafa_uniqueness}
 
--   For each loading compute its sum of squares. Argument why communalities and squared sum of loadings are different.
+    phi <- diag(diag(R-L_PCA %*% t(L_PCA)))
+    phi
+    ```
 
-```{r communalities_vs_ssl}
+    -   Perform a varimax rotation (*?varimax*) and interpret the factors.
 
-```
+    ```{r pcafa_varimax}
 
--   Give the rotated loadings by a varimax rotation
+    L_varimax <- varimax(L_PCA)
 
-```{r ml_varimax}
+    L_varimax$loadings[1:p,1:m]
+    ```
 
-```
+    Variables associated with **factor 1** are **rating, complaints, privilege** and **learning**. Variables associated with **factor 2** are **critical** and **advance**. Variable **raises** is associated with both factors.
 
--   Give the rotated loadings by a oblimin rotation
+    With this classification of variables it could be interpreted that **factor 1** captures aspects related to satisfaction of employees, perception of realization and perception of attention of employees needs from the management. In comparison, **factor 2** could be interpreted as the factor associated to perception of productivity and evaluation and recognition of work production. **Raises** could be interpreted as a variable that is related to satisfaction perception (**factor 1**) and work recognition (**factor 2**)
 
-```{r ml_oblimin}
+    -   Compute the factor scores by Thomson-Thurstone
 
-```
+    ```{r pcafa_scores}
 
--   Compare the varimax rotated loadings with those of the oblimin. Interpret the factors
+    sigma <- L_PCA %*% t(L_PCA) + phi
 
-```{r ml_factor_interpretation}
+    scores <- Xs %*% solve(sigma) %*% L_PCA
+    scores
+    ```
 
-```
+    2.  Compute the Maximum Likelihood Estimation approach to Factor Analysis using the `fa` method from the `psych` library using the argument **fm="ml"**:
 
--   Compute the factor scores by Thomson
+    -   Decide the number of factors and provide the loadings.
 
-```{r ml_scores}
+    ```{r ml_factors_and_loadings}
+    # ?fa
 
-```
+    paste("Deegres of freedom of discrepancy function n*F_ML")
+    paste("m = ", 1:p, " df = ", 0.5*(p-1:p)^2-0.5*(p+1:p))
 
--   Compare the rotated loadings from PCA and the ones from ML. Identify and discuss any significant discrepancies between the two sets of loadings.
+    res1 <- fa(Xs, nfactors = 1, fm = "ml")
+    res2 <- fa(Xs, nfactors = 2, fm = "ml")
+    res3 <- fa(Xs, nfactors = 3, fm = "ml")
 
-```{r pcafa_vs_mlfa}
+    paste("p_value model m = 1: ", round(res1$PVAL,2))
+    paste("p_value model m = 2: ", round(res2$PVAL,2))
+    paste("p_value model m = 3: ", round(res3$PVAL,2))
 
-```
+    L <- res2$loadings[1:p,1:2]
+    L
+    ```
+
+    As a starting point, it can be discarded m \>= 4 as provides negative values of degrees of freedom.
+
+    From the possible choices the model m = 2 and 3 provides models with p-values greater than 0.05, meaning that the discrepancy between the model covariance matriz and the observed covariance matrix is not meaningful. And it will be picked m = 2 as is the simplest model between these two candidates.
+
+    -   Give communalities.
+
+    ```{r ml_communalities}
+    res2$communalities
+    ```
+
+    -   Give the unique variances
+
+    ```{r ml_unique_variances}
+    res2$uniquenesses
+    ```
+
+    -   For each loading compute its sum of squares. Argument why communalities and squared sum of loadings are different.
+
+    ```{r communalities_vs_ssl}
+
+    h2 <- colSums(t(L)^2)
+    h2
+    ```
+
+    The discrepancy is due to the assumption of correlation of factors. In the computation of sum of squares there is no assumption of correlation between factors, leading to inflated communalities. The results from res2\$communalities considers the correlation matrix as fa() allows correlated factors by default.
+
+    -   Give the rotated loadings by a varimax rotation
+
+    ```{r ml_varimax}
+
+    res_varimax <- fa(Xs, nfactors = 2, fm = "ml", rotate = "varimax")
+    res_varimax$loadings[1:p,1:2]
+    ```
+
+    -   Give the rotated loadings by a oblimin rotation
+
+    ```{r ml_oblimin}
+
+    res_oblimin <- fa(Xs, nfactors = 2, fm = "ml", rotate = "oblimin")
+    res_oblimin$loadings[1:p,1:2]
+    ```
+
+    -   Compare the varimax rotated loadings with those of the oblimin. Interpret the factors
+
+    ```{r ml_factor_interpretation}
+    ```
+
+    The rotated loadings obtained using **Varimax** (orthogonal rotation) and **Oblimin** (oblique rotation) are very similar. When contrasting results, the Oblimin rotation presents a slightly clearer and more separated structure for these variables compared to the Varimax rotation. However, the difference is not substantial. This can be interpreted to mean that while there may be a slight correlation between the underlying factors, it is not highly significant, as the Oblimin results do not differ drastically from the Varimax results (which assume zero correlation).
+
+    In both cases, **Factor 1** loads strongly on **rating, complaints, privileges, learning, and raises**, representing a **general job satisfaction and management support**. **Factor 2** is clearly dominated by **advance**. This factor could be associated to perception of productivity and recognition of work production. The variable **raises** shows moderate loadings on both factors in both rotations.
+
+    -   Compute the factor scores by Thomson
+
+    ```{r ml_scores}
+    L_varimax <- res_varimax$loadings
+    L_oblimin <- res_oblimin$loadings
+    sigma_varimax <- L_varimax %*% t(L_varimax) + diag(res_varimax$uniquenesses)
+
+    sigma_oblimin <- L_oblimin %*% t(L_oblimin) + diag(res_oblimin$uniquenesses)
+
+    scores_varimax <- Xs %*% solve(sigma_varimax) %*% L_varimax
+    scores_oblimin <- Xs %*% solve(sigma_oblimin) %*% L_oblimin
+
+    scores_varimax
+    scores_oblimin
+    ```
+
+    -   Compare the rotated loadings from PCA and the ones from ML. Identify and discuss any significant discrepancies between the two sets of loadings.
+
+    ```{r pcafa_vs_mlfa}
+    df_comparison <- cbind(varimax(L_PCA)$loadings[1:p,1:2], 
+            L_varimax[1:p,1:2],
+            L_oblimin[1:p,1:2])
+
+    colnames(df_comparison) <- c("f1_PCA", "f2_PCA", "f1_MLV", "f2_MLV", "f1_MLO", "f2_MLO")
+
+    df_comparison
+    ```
+
+    Before any analysis it should be mentioned that the importance of comparison of loadings are in the magnitude not in the sign.
+
+    The most important discrepancy between the two approaches is the difference in the loadings obtained from the PCA and ML methods. This difference can mainly be explained by the fact that PCA does not differentiate between shared variance and unique variance, whereas ML does.
+
+    If, for instance, we focus on the *critical* variable, while in PCA it shows a strong loading on factor 2 (-0.73), under ML it drops to much weaker loadings (0.15 and 0.28). Observing the ML uniqueness for ***critical***, it has a value of 0.89, indicating that its shared variance is much lower than what PCA assumed, leading to weaker factor loadings. A similar reasoning can be applied to the rest of the variables, but *critical* presents the largest discrepancy between the two approaches.
+
+    A second discrepancy point is observed in the variables ***privileges*****, *learning*,** and ***raises***. Under ML Varimax, these variables show cross-loadings (similar weights on both factors), making the interpretation and separation of the variables into latent factors more difficult. PCA shows a more distinct structure that facilitates this separation, though this might be an unrealistic representation due to the nature of the PCA method itself.
