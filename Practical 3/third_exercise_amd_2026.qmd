@@ -1,0 +1,485 @@
+---
+title: "Lab 3: MDS and CA practical"
+format: pdf
+editor: visual
+author: Leonel Nabaza and Michael Jiménez
+---
+
+## Third deliverable
+
+**Instructions**
+
+Work to be done in pairs. Deadline: 1st of April.
+
+Like in the previous deliverables, please give precise answers with proper justifications.
+
+**Introduction**
+
+In this last exercise we are going to perform a little of the two last methods explained at class: Multidimensional Scaling and Correspondence Analysis.
+
+Maybe, during these exercises we learn a secret relationship between these methods...
+
+## MDS and CA
+
+### MDS
+
+Given the following matrix of **squared** **distances**:
+
+```{r}
+D <- read.csv("https://raw.githubusercontent.com/Afrojam/toy_datasets/refs/heads/main/economy_race_distances.csv", row.names = 1)
+n <- nrow(D)
+ones <- rep(1, n)
+print(D)
+```
+
+**Compute**:
+
+1.  The double centering matrix $B$ .
+2.  Perform eigendecomposition on $B$ . Then deliver:
+    1.  The eigenvalues. Comment if there are strong negative eigenvalues.
+
+    2.  Justify if the provided distances come from a metric.
+
+    3.  Compute the goodness of fit and chose the number of principal coordinates. We want to have a quality of the approximation greater than 80%.
+
+    4.  Calculate the new coordinates in the principal coordinates space and perform a scatter plot.
+
+    5.  Provide a plausible label for the principal coordinates based on the position of the points
+
+```{r}
+# double centering matrix
+D <- as.matrix(D)
+storage.mode(D) <- "double"
+
+n <- nrow(D)
+J <- diag(n) - matrix(1, n, n) / n
+B <- -0.5 * J %*% D %*% J
+
+round(B, 4)
+```
+
+```{r}
+#eigen decomposition on B
+eig <- eigen(B)
+eig$values
+```
+
+There aren't strong negative eigenvalues, since they are raised to very small powers.
+
+Since the negative eigenvalues are negligible and the matrix $B$ is positive semidefinite up to numerical precision, the provided squared distances are compatible with a Euclidean metric.
+
+For the goodness of the fit we shall use:
+
+$$
+\frac{\sum_{i = 1}^k \lambda_i}{\sum_{\lambda_j > 0} \lambda_j}
+$$
+
+```{r}
+lambda <- eig$values
+lambda[lambda < 0]
+lambda_pos <- lambda[lambda > 1e-10]
+gof <- cumsum(lambda_pos) / sum(lambda_pos)
+
+data.frame(
+  Dimension = 1:length(lambda_pos),
+  Eigenvalue = round(lambda_pos, 6),
+  Cumulative_GoF = round(gof, 6)
+)
+
+k <- which(gof > 0.80)[1]
+k
+```
+
+Although with one coordinate we'd have enough, it would be convenient for visual purposes to utilize two components.
+
+For the new coordinates $X = V_k \Lambda_k^{1/2}$
+
+```{r}
+V <- eig$vectors[, 1:k, drop = FALSE]
+X <- sweep(V, 2, sqrt(lambda[1:k]), `*`)
+
+rownames(X) <- rownames(D)
+round(X, 4)
+```
+
+For the plot, we need to use two dimensions:
+
+```{r}
+k_plot <- 2
+X2 <- eig$vectors[, 1:k_plot, drop = FALSE] %*% diag(sqrt(lambda[1:k_plot]), nrow = k_plot)
+rownames(X2) <- rownames(D)
+
+X2_df <- data.frame(
+  Dim1 = X2[,1],
+  Dim2 = X2[,2],
+  Point = rownames(X2)
+)
+
+library("ggplot2")
+library("ggrepel")
+
+ggplot(X2_df, aes(x = Dim1, y = Dim2, label = Point)) +
+  geom_point(size = 3) +
+  geom_text_repel() +
+  theme_minimal() +
+  labs(title = "MDS map using the first two principal coordinates",
+       x = "Principal coordinate 1",
+       y = "Principal coordinate 2")
+```
+
+A plausible interpretation of the principal coordinates is the following:\
+\
+- **Principal coordinate 1** seems to represent the main racial contrast in the data, separating **African American** (and to a lesser extent **Hispanic**) from **White** and **Asian**.\
+- **Principal coordinate 2** seems to capture a more specific contrast that mainly separates the **Hispanic** group from the other categories.\
+\
+Therefore, a plausible labeling is:\
+\
+- **Dim 1**: African American / Hispanic vs White / Asian contrast\
+- **Dim 2**: Hispanic differentiation
+
+### CA
+
+Now, we are going to use the following data from the library **openintro.**
+
+```{r}
+library(openintro)
+data(hsb2)
+tab <- table(hsb2$ses, hsb2$race)
+```
+
+The data, as we are going to use it, consists in a cross table between two categorical variables:
+
+-   **Ses**: Socio economic status of student's family. With categories:
+
+    -   low, middle and high.
+
+-   **Race:** Student's race, with categories:
+
+    -   african american, asian, hispanic and white.
+
+**Exercises:**
+
+1.  Give the correspondence table (P), the row profiles matrix, the column profiles matrix and the average row profile (r) and the average column profile (c).
+
+    ```{r}
+    N <- as.matrix(tab)
+    n_total <- sum(N)
+
+    P <- N / n_total
+    r <- rowSums(P)
+    c <- colSums(P)
+
+    Dr_inv <- diag(1 / r)
+    Dc_inv <- diag(1 / c)
+
+    row_profiles <- Dr_inv %*% P
+    col_profiles <- P %*% Dc_inv
+
+    cat("Correspondence table P:\n")
+    print(round(P, 6))
+
+    cat("\nRow masses r:\n")
+    print(round(r, 6))
+
+    cat("\nColumn masses c:\n")
+    print(round(c, 6))
+
+    cat("\nRow profiles matrix:\n")
+    print(round(row_profiles, 6))
+
+    cat("\nColumn profiles matrix:\n")
+    print(round(col_profiles, 6))
+    ```
+
+2.  Give a ternary plot, if it is possible. If not, justify why. If yes, explain what you observe about the relationship between points and vertex.
+
+    A ternary plot is only possible if the composition has exactly 3 parts.\
+    Here:
+
+    1.   Row profiles have 4 components (because race has 4 categories), so they **cannot** be represented in a ternary plot.
+
+    2.   Column profiles have 3 components (because ses has 3 categories), so they **can** be represented in a ternary plot.
+
+    ```{r}
+    cat("Number of row profile components:", ncol(row_profiles), "\n")
+    cat("Number of column profile components:", nrow(col_profiles), "\n")
+
+    install.packages("ggtern")
+    library(ggtern)
+
+      # Column profiles: each race gives a distribution over ses = low, middle, high
+      col_prof_df <- as.data.frame(t(col_profiles))
+      col_prof_df$Race <- rownames(col_prof_df)
+
+      # Rename columns to something simpler if needed
+      colnames(col_prof_df)[1:3] <- c("low", "middle", "high")
+
+      ggtern(data = col_prof_df, aes(x = low, y = middle, z = high, label = Race)) +
+        geom_point(size = 3) +
+        geom_text_repel() +
+        labs(title = "Ternary plot of column profiles (Race over SES)") +
+        theme_bw()
+    ```
+
+3.  Give the matrix of standardized residuals (S).
+
+    ```{r}
+    Dr_mhalf <- diag(1 / sqrt(r))
+    Dc_mhalf <- diag(1 / sqrt(c))
+
+    S <- Dr_mhalf %*% (P - r %*% t(c)) %*% Dc_mhalf
+
+    cat("Standardized residuals matrix S:\n")
+    print(round(S, 6))
+    ```
+
+4.  Obtain the CA solution. Then deliver:
+
+    -   Principal inertias.
+
+    -   Quality of representation with two principal axis.
+
+    -   Correlations and contributions.
+
+    ```{r}
+    svd_S <- svd(S)
+
+    U <- svd_S$u
+    Delta <- diag(svd_S$d)
+    V <- svd_S$v
+
+    singular_values <- svd_S$d
+    principal_inertias <- singular_values^2
+
+    cat("Singular values:\n")
+    print(round(singular_values, 6))
+
+    cat("\nPrincipal inertias:\n")
+    print(round(principal_inertias, 6))
+    ```
+
+    ```{r}
+    qual_2d <- sum(principal_inertias[1:2]) / sum(principal_inertias)
+    cat("Quality of representation with two axes:", round(qual_2d, 6), "\n")
+
+    Phi <- Dr_mhalf %*% U
+    Gamma <- Dc_mhalf %*% V
+
+    F <- Phi %*% Delta
+    G <- Gamma %*% Delta
+
+    rownames(F) <- rownames(N)
+    rownames(G) <- colnames(N)
+
+    cat("Row principal coordinates:\n")
+    print(round(F, 6))
+
+    cat("\nColumn principal coordinates:\n")
+    print(round(G, 6))
+    ```
+
+    ```{r}
+    #similarity for rows
+    row_ctr <- matrix(0, nrow = nrow(F), ncol = length(principal_inertias))
+    col_ctr <- matrix(0, nrow = nrow(G), ncol = length(principal_inertias))
+
+    for (a in seq_along(principal_inertias)) {
+      row_ctr[, a] <- r * F[, a]^2 / principal_inertias[a]
+      col_ctr[, a] <- c * G[, a]^2 / principal_inertias[a]
+    }
+
+    rownames(row_ctr) <- rownames(N)
+    rownames(col_ctr) <- colnames(N)
+    colnames(row_ctr) <- paste0("Dim", seq_along(principal_inertias))
+    colnames(col_ctr) <- paste0("Dim", seq_along(principal_inertias))
+
+    cat("Row contributions:\n")
+    print(round(row_ctr, 6))
+
+    cat("\nColumn contributions:\n")
+    print(round(col_ctr, 6))
+
+
+    #similarity for columns
+    row_cos2 <- F^2 / rowSums(F^2)
+    col_cos2 <- G^2 / rowSums(G^2)
+
+    rownames(row_cos2) <- rownames(N)
+    rownames(col_cos2) <- colnames(N)
+    colnames(row_cos2) <- paste0("Dim", seq_len(ncol(row_cos2)))
+    colnames(col_cos2) <- paste0("Dim", seq_len(ncol(col_cos2)))
+
+    cat("Row cos²:\n")
+    print(round(row_cos2, 6))
+
+    cat("\nColumn cos²:\n")
+    print(round(col_cos2, 6))
+    ```
+
+5.  Perform a row profiles biplot. What you observe?
+
+    ```{r}
+    rownames(F) <- rownames(N)
+    rownames(Gamma) <- colnames(N)
+
+    row_plot_df <- data.frame(
+      Dim1 = F[, 1],
+      Dim2 = F[, 2],
+      Label = rownames(F),
+      Type = "Row"
+    )
+
+    col_std_df <- data.frame(
+      Dim1 = Gamma[, 1],
+      Dim2 = Gamma[, 2],
+      Label = rownames(Gamma),
+      Type = "Column (standard)"
+    )
+
+    library(ggplot2)
+    library(ggrepel)
+
+    ggplot() +
+      geom_hline(yintercept = 0, linetype = 2, color = "gray50") +
+      geom_vline(xintercept = 0, linetype = 2, color = "gray50") +
+      geom_point(data = row_plot_df, aes(Dim1, Dim2), size = 3) +
+      geom_text_repel(data = row_plot_df, aes(Dim1, Dim2, label = Label)) +
+      geom_point(data = col_std_df, aes(Dim1, Dim2), shape = 17, size = 3) +
+      geom_text_repel(data = col_std_df, aes(Dim1, Dim2, label = Label)) +
+      labs(
+        title = "CA Row Profiles Biplot",
+        x = "Dimension 1",
+        y = "Dimension 2"
+      ) +
+      theme_minimal()
+    ```
+
+    From the CA row profiles biplot, several patterns can be observed:\
+    \
+    - Dimension 1 represents a strong contrast between racial groups. African American (and to a lesser extent Hispanic) are located on the positive side, while White is on the negative side. This dimension reflects a gradient opposing African American vs White populations.\
+    \
+    - Dimension 2 mainly separates the Hispanic group from the others, as it is located far above all other categories. This suggests a specific pattern for Hispanic that is not captured by the main axis.\
+    \
+    - Regarding the association between race and socioeconomic status:\
+     - African American is strongly associated with low SES.\
+     - White is associated with high SES.\
+     - Asian is closer to middle SES, indicating a more balanced profile.\
+     - Hispanic appears more distinct and not strongly aligned with a single SES category.
+
+6.  Perform a column profiles biplot. What you observe?
+
+    ```{r}
+    rownames(Phi) <- rownames(N)
+    rownames(G) <- colnames(N)
+    row_std_df <- data.frame(
+      Dim1 = Phi[, 1],
+      Dim2 = Phi[, 2],
+      Label = rownames(Phi),
+      Type = "Row (standard)"
+    )
+
+    col_plot_df <- data.frame(
+      Dim1 = G[, 1],
+      Dim2 = G[, 2],
+      Label = rownames(G),
+      Type = "Column"
+    )
+
+    ggplot() +
+      geom_hline(yintercept = 0, linetype = 2, color = "gray50") +
+      geom_vline(xintercept = 0, linetype = 2, color = "gray50") +
+      geom_point(data = col_plot_df, aes(Dim1, Dim2), size = 3) +
+      geom_text_repel(data = col_plot_df, aes(Dim1, Dim2, label = Label)) +
+      geom_point(data = row_std_df, aes(Dim1, Dim2), shape = 17, size = 3) +
+      geom_text_repel(data = row_std_df, aes(Dim1, Dim2, label = Label)) +
+      labs(
+        title = "CA Column Profiles Biplot",
+        x = "Dimension 1",
+        y = "Dimension 2"
+      ) +
+      theme_minimal()
+    ```
+
+    From the CA column profiles biplot, we observe the following:\
+    \
+    - Dimension 1represents a clear socioeconomic gradient, separating high SES (left) from low SES (right), with middle SES located closer to the center.\
+    \
+    - There is a strong association between:\
+     - Low SES and African American\
+     - High SES and White\
+     - Middle SES and Asian\
+    \
+    - The Hispanic group is located near the origin, indicating a more balanced distribution across SES categories.\
+    \
+    - Dimension 2 mainly distinguishes the middle SES category from the others, as it is located much higher than both low and high SES.\
+    \
+    Overall, the plot confirms a strong relationship between race and socioeconomic status, with a dominant gradient from high to low SES along the first dimension.
+
+7.  Interpret the symmetric biplot. Use visual information to give contributions and the relative frequency for each point.
+
+    ```{r}
+    Delta_half <- diag(sqrt(singular_values), nrow = length(singular_values))
+
+    F_sym <- Phi %*% Delta_half
+    G_sym <- Gamma %*% Delta_half
+
+    rownames(F_sym) <- rownames(N)
+    rownames(G_sym) <- colnames(N)
+
+    row_sym_df <- data.frame(
+      Dim1 = F_sym[, 1],
+      Dim2 = F_sym[, 2],
+      Label = rownames(F_sym),
+      Set = "Rows"
+    )
+
+    col_sym_df <- data.frame(
+      Dim1 = G_sym[, 1],
+      Dim2 = G_sym[, 2],
+      Label = rownames(G_sym),
+      Set = "Columns"
+    )
+
+    library(ggplot2)
+    library(ggrepel)
+
+    ggplot() +
+      geom_hline(yintercept = 0, linetype = 2, color = "gray50") +
+      geom_vline(xintercept = 0, linetype = 2, color = "gray50") +
+      geom_point(data = row_sym_df, aes(Dim1, Dim2), size = 3) +
+      geom_text_repel(data = row_sym_df, aes(Dim1, Dim2, label = Label)) +
+      geom_point(data = col_sym_df, aes(Dim1, Dim2), shape = 17, size = 3) +
+      geom_text_repel(data = col_sym_df, aes(Dim1, Dim2, label = Label)) +
+      labs(
+        title = "CA Symmetric Biplot",
+        x = "Dimension 1",
+        y = "Dimension 2"
+      ) +
+      theme_minimal()
+    ```
+
+    From the symmetric biplot, we observe the overall association structure between race and socioeconomic status.
+
+    The first dimension represents the main gradient in the data. On the positive side, **African American** is closely associated with **low SES**, while on the negative side, **White** is associated with **high SES**. This indicates a strong socioeconomic contrast linked to racial categories.
+
+    The second dimension captures a secondary pattern. The **Hispanic** group and the **middle SES** category are both located higher along this axis, suggesting a specific association that is not explained by the main gradient.
+
+    The **Asian** group is located near the origin, indicating a more balanced profile and weaker association with extreme SES categories.
+
+    Overall, the symmetric biplot confirms that the dominant relationship in the data is the opposition between **African American / low SES** and **White / high SES**, with a secondary structure involving **Hispanic** and **middle SES**.
+
+8.  Can you made the connection between MDS and CA? Explain the cause and which results should be equal.
+
+    Correspondence Analysis (CA) can be interpreted as a particular case of Multidimensional Scaling (MDS). Specifically, CA is equivalent to applying classical MDS to the row (or column) profiles using the chi-square distance.
+
+    The reason for this connection is that both methods rely on a spectral decomposition of a matrix that represents the relationships between observations. In MDS, this is done through the eigendecomposition of the double-centered distance matrix. In CA, it is done through the singular value decomposition of the standardized residual matrix.
+
+    The key equivalences are:
+
+    -   The eigenvalues in MDS correspond to the principal inertias in CA (i.e., the squared singular values).
+    -   The coordinates obtained in both methods are the same up to a possible change of sign or rotation.
+    -   The geometric structure (distances between points) is preserved in both representations.
+
+    Therefore, CA can be seen as MDS applied to profiles under the chi-square metric, adapted specifically for contingency tables.
+
+**Note**: There are no restrictions on the libraries to use, but some steps maybe only possible with manual calculation (i.e.: not using libraries that automatize the steps).
