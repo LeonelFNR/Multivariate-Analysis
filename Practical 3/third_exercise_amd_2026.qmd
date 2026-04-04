@@ -1,6 +1,6 @@
 ---
 title: "Lab 3: MDS and CA practical"
-format: pdf
+format: html
 editor: visual
 author: Leonel Nabaza and Michael Jiménez
 ---
@@ -90,7 +90,7 @@ k <- which(gof > 0.80)[1]
 k
 ```
 
-Although with one coordinate we'd have enough, it would be convenient for visual purposes to utilize two components.
+With one coordinate we have enough explanation.
 
 For the new coordinates $X = V_k \Lambda_k^{1/2}$
 
@@ -102,40 +102,35 @@ rownames(X) <- rownames(D)
 round(X, 4)
 ```
 
-For the plot, we need to use two dimensions:
-
 ```{r}
-k_plot <- 2
+k_plot <- 1
 X2 <- eig$vectors[, 1:k_plot, drop = FALSE] %*% diag(sqrt(lambda[1:k_plot]), nrow = k_plot)
 rownames(X2) <- rownames(D)
 
 X2_df <- data.frame(
   Dim1 = X2[,1],
-  Dim2 = X2[,2],
   Point = rownames(X2)
 )
 
 library("ggplot2")
 library("ggrepel")
 
-ggplot(X2_df, aes(x = Dim1, y = Dim2, label = Point)) +
+ggplot(X2_df, aes(x = Dim1, y = c(1,1,1,1), label = Point)) +
   geom_point(size = 3) +
   geom_text_repel() +
   theme_minimal() +
-  labs(title = "MDS map using the first two principal coordinates",
+  labs(title = "MDS map using the first principal coordinate",
        x = "Principal coordinate 1",
-       y = "Principal coordinate 2")
+       y = "")
 ```
 
 A plausible interpretation of the principal coordinates is the following:\
 \
 - **Principal coordinate 1** seems to represent the main racial contrast in the data, separating **African American** (and to a lesser extent **Hispanic**) from **White** and **Asian**.\
-- **Principal coordinate 2** seems to capture a more specific contrast that mainly separates the **Hispanic** group from the other categories.\
 \
 Therefore, a plausible labeling is:\
 \
-- **Dim 1**: African American / Hispanic vs White / Asian contrast\
-- **Dim 2**: Hispanic differentiation
+- **Dim 1**: Racial contrast
 
 ### CA
 
@@ -196,16 +191,17 @@ The data, as we are going to use it, consists in a cross table between two categ
     A ternary plot is only possible if the composition has exactly 3 parts.\
     Here:
 
-    1.   Row profiles have 4 components (because race has 4 categories), so they **cannot** be represented in a ternary plot.
+    1.  Row profiles have 4 components (because race has 4 categories), so they **cannot** be represented in a ternary plot.
 
-    2.   Column profiles have 3 components (because ses has 3 categories), so they **can** be represented in a ternary plot.
+    2.  Column profiles have 3 components (because ses has 3 categories), so they **can** be represented in a ternary plot.
 
     ```{r}
     cat("Number of row profile components:", ncol(row_profiles), "\n")
     cat("Number of column profile components:", nrow(col_profiles), "\n")
 
-    install.packages("ggtern")
+    #install.packages("ggtern")
     library(ggtern)
+
 
       # Column profiles: each race gives a distribution over ses = low, middle, high
       col_prof_df <- as.data.frame(t(col_profiles))
@@ -220,6 +216,8 @@ The data, as we are going to use it, consists in a cross table between two categ
         labs(title = "Ternary plot of column profiles (Race over SES)") +
         theme_bw()
     ```
+
+    Category african-american it's the nearest point to the low vertex category. It's also a point separated from the other three, that can be understood as a category that differs form the others. Categories hispanic and asian are equally nearer to category middle vertex with the difference that hispanic is nearer to low than asian. White it's the nearest point to the high and middle vertex. We can observe that points are spread suggesting that categories follows a heterogeneous distribution for SES.
 
 3.  Give the matrix of standardized residuals (S).
 
@@ -344,8 +342,9 @@ The data, as we are going to use it, consists in a cross table between two categ
       geom_vline(xintercept = 0, linetype = 2, color = "gray50") +
       geom_point(data = row_plot_df, aes(Dim1, Dim2), size = 3) +
       geom_text_repel(data = row_plot_df, aes(Dim1, Dim2, label = Label)) +
-      geom_point(data = col_std_df, aes(Dim1, Dim2), shape = 17, size = 3) +
-      geom_text_repel(data = col_std_df, aes(Dim1, Dim2, label = Label)) +
+      geom_segment(data = col_std_df, aes(x = 0, y = 0, xend = Dim1, yend = Dim2), arrow = arrow(length = unit(0.2, "cm"), type = "closed"), 
+                   color = "red") +
+      geom_text_repel(data = col_std_df, aes(Dim1, Dim2, label = Label), col = "red") +
       labs(
         title = "CA Row Profiles Biplot",
         x = "Dimension 1",
@@ -354,17 +353,11 @@ The data, as we are going to use it, consists in a cross table between two categ
       theme_minimal()
     ```
 
-    From the CA row profiles biplot, several patterns can be observed:\
-    \
-    - Dimension 1 represents a strong contrast between racial groups. African American (and to a lesser extent Hispanic) are located on the positive side, while White is on the negative side. This dimension reflects a gradient opposing African American vs White populations.\
-    \
-    - Dimension 2 mainly separates the Hispanic group from the others, as it is located far above all other categories. This suggests a specific pattern for Hispanic that is not captured by the main axis.\
-    \
-    - Regarding the association between race and socioeconomic status:\
-     - African American is strongly associated with low SES.\
-     - White is associated with high SES.\
-     - Asian is closer to middle SES, indicating a more balanced profile.\
-     - Hispanic appears more distinct and not strongly aligned with a single SES category.
+    From the CA row profiles biplot, several patterns can be observed:
+
+    -   It is possible to observe that in the first dimension, column categories hispanic, african-american and asian are in opposition to category white, meaning that category white has a different column pattern in comparison to the rest of the racial groups, especially african american.
+    -   Dimension 2 mainly separates the Hispanic group from the others, as it is located far above all other categories. This suggests a specific pattern for Hispanic that is manly captured by the main axis.
+    -   Also it is possible to observe that rows categories high and middle are near, meaning that they have similar profiles and they are near to the origin meaning that they have profiles closed to the average row profile. In contrast, low deviates more from the origin denoting a more unique row pattern.
 
 6.  Perform a column profiles biplot. What you observe?
 
@@ -390,8 +383,10 @@ The data, as we are going to use it, consists in a cross table between two categ
       geom_vline(xintercept = 0, linetype = 2, color = "gray50") +
       geom_point(data = col_plot_df, aes(Dim1, Dim2), size = 3) +
       geom_text_repel(data = col_plot_df, aes(Dim1, Dim2, label = Label)) +
-      geom_point(data = row_std_df, aes(Dim1, Dim2), shape = 17, size = 3) +
-      geom_text_repel(data = row_std_df, aes(Dim1, Dim2, label = Label)) +
+      geom_segment(data = row_std_df, aes(x = 0, y = 0, xend = Dim1, yend = Dim2), 
+                   arrow = arrow(length = unit(0.2, "cm"), type = "closed"), 
+                   color = "red") +
+      geom_text_repel(data = row_std_df, aes(Dim1, Dim2, label = Label), col = "red") +
       labs(
         title = "CA Column Profiles Biplot",
         x = "Dimension 1",
@@ -400,20 +395,10 @@ The data, as we are going to use it, consists in a cross table between two categ
       theme_minimal()
     ```
 
-    From the CA column profiles biplot, we observe the following:\
-    \
-    - Dimension 1represents a clear socioeconomic gradient, separating high SES (left) from low SES (right), with middle SES located closer to the center.\
-    \
-    - There is a strong association between:\
-     - Low SES and African American\
-     - High SES and White\
-     - Middle SES and Asian\
-    \
-    - The Hispanic group is located near the origin, indicating a more balanced distribution across SES categories.\
-    \
-    - Dimension 2 mainly distinguishes the middle SES category from the others, as it is located much higher than both low and high SES.\
-    \
-    Overall, the plot confirms a strong relationship between race and socioeconomic status, with a dominant gradient from high to low SES along the first dimension.
+    From the CA column profiles biplot, we observe the following:
+
+    -   Observing the points, we can see that in the first dimension point african-american deviates from the origin, meaning that it have a more unique profiles in comparison to the average profile. Also we can see that white, asian and hispanic are near, forming a block with similar profiles.
+    -   It is possible to observe that categories middle and high have similar row patterns as they point to the same direction in the first axis. In contrast to this block of vectors, low points to a different dimension, denoting a different row pattern compared to high and middle.
 
 7.  Interpret the symmetric biplot. Use visual information to give contributions and the relative frequency for each point.
 
